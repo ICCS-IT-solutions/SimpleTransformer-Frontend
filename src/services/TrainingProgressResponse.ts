@@ -8,6 +8,8 @@ export type TrainingProgressResponse = {
     totalEpochs: number;
     currentBatch: number;
     totalBatches: number;
+    numSubBatches: number;
+    currentSubBatch: number;
     currentLoss: number;
     message: string;
     checkpoint?: string;

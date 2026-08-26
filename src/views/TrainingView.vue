@@ -84,8 +84,22 @@ const jobFields: TableField<TrainingProgressResponse>[] = [
         key: "currentBatch",
         label: "Batch",
         formatter: ({ value, item }) => {
-        return `${value} / ${item.totalBatches}`;
+        return `${value} / ${item.totalBatches / item.numSubBatches }`;
         },
+    },
+    {
+      key: "numSubBatches",
+      label: "Sub-Batches",
+      formatter: ({ value }) => {
+        return `${value}`;
+      }
+    },
+    {
+      key: "currentSubBatch",
+      label: "Sub-Batch",
+      formatter: ({ value, item }) => {
+        return `${value} / ${item.numSubBatches}`;
+      }
     },
     {
         key: "currentLoss",
@@ -113,6 +127,11 @@ const stopJobPolling = () => {
     pollingTimer = null;
   }
 };
+
+const isUndefinedOrEmpty = (value: number) =>
+{
+  return value === undefined || value === null || value === 0;
+}
 
 type TrainingConfigPreset = {
   label: string;
