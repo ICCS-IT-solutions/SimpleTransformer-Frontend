@@ -1,5 +1,15 @@
-# Vue 3 + TypeScript + Vite
+# SimpleTransformer Frontend
 
-This template should help get you started developing with Vue 3 and TypeScript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+The web frontend for [SimpleTransformer], an experimental LLM project built from the ground up in C#.
 
-Learn more about the recommended Project Setup and IDE Support in the [Vue Docs TypeScript Guide](https://vuejs.org/guide/typescript/overview.html#project-setup).
+The frontend is built with Vue 3 and TypeScript and provides a web-based interface for interacting with the SimpleTransformer backend, including:
+
+- Model inference
+- Model training from live text or files
+- Training job monitoring and progress
+- Vocabulary management
+- Model configuration
+
+The frontend communicates with the SimpleTransformer ASP.NET Core REST API.
+
+> SimpleTransformer is primarily a learning and experimentation project focused on understanding the components and engineering involved in building an LLM from the ground up.
