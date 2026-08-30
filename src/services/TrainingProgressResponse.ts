@@ -18,3 +18,4 @@ export type TrainingProgressResponse = {
     lastUpdatedAt: string;
     error?: string;
 };
+

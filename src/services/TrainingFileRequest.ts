@@ -1,5 +1,7 @@
 export type TrainingFileRequest = {
-    config: string;
     textFile: File;
+    transformerModelId: string;
+    vocabularyId: string;
+    previousCheckpointId: string;
     previousCheckpoint: string;
 };

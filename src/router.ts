@@ -25,6 +25,16 @@ const router = createRouter({
             name: 'vocab',
             component: () => import('./views/VocabularyManagementView.vue')
         },
+        {
+            path: '/configmanagement',
+            name: 'config',
+            component: () => import('./views/ConfigManagerView.vue')
+        },
+        {
+            path: '/models',
+            name: 'models',
+            component: () => import('./views/TransformerModelView.vue')
+        },
         //Catch-all
         {
             path: '/:pathMatch(.*)*',

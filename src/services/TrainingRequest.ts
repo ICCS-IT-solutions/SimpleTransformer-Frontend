@@ -1,5 +1,7 @@
 export type TrainingRequest = {
-    config: string;
     inputText: string;
+    transformerModelId: string;
+    vocabularyId: string;
+    previousCheckpointId: string;
     previousCheckpoint: string;
 };

@@ -9,6 +9,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@coreui/coreui": "^5.9.0",
+    "@coreui/icons": "^3.1.0",
+    "@coreui/icons-vue": "^2.2.0",
+    "@coreui/vue": "^5.10.0",
     "pinia": "^4.0.3",
     "vue": "^3.5.41",
     "vue-router": "^5.2.0"

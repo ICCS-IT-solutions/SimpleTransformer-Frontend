@@ -3,8 +3,9 @@ import type { ApiResponse } from "./ApiResponse";
 import type { CompileVocabularyRequest } from "./CompileVocabularyRequest";
 import type { LoadVocabularyRequest } from "./LoadVocabularyRequest";
 import type { VocabularyCompilationResponse } from "./VocabularyCompilationResponse";
-import type { VocabularyLoaderResponse } from "./VocabularyLoaderResponse";
+import type { AvailableVocabulariesResponse, VocabularyLoaderResponse, VocabularyUploadRequest } from "./VocabularyLoaderResponse";
 import type { VocabularyPropertiesResponse } from "./VocabularyPropertiesResponse";
+import type { VocabularySourceFile } from "./VocabularySourceFile";
 
 
 const loadFile = async (req: LoadVocabularyRequest): Promise<ApiResponse<VocabularyLoaderResponse>> => {
@@ -22,6 +23,33 @@ const getCurrentVocabSize = async (): Promise<ApiResponse<VocabularyPropertiesRe
     return response.data;
 }
 
-export default { loadFile, compileFiles, getCurrentVocabSize };
+const uploadFiles = async (
+    req: VocabularyUploadRequest
+): Promise<ApiResponse<VocabularyLoaderResponse>> => {
+
+    const formData = new FormData();
+
+    for (const file of req.files) {
+        formData.append("files", file);
+    }
+
+    const response = await axiosClient.post(
+        "/vocabulary/upload",
+        formData
+    );
+
+    return response.data;
+};
+
+const getVocabSources = async (): Promise<ApiResponse<VocabularySourceFile[]>> => {
+    var response = await axiosClient.get('/vocabulary/sources');
+    return response.data;
+}
+const getAvailableVocabularies = async (): Promise<ApiResponse<AvailableVocabulariesResponse>> => {
+    var response = await axiosClient.get('/vocabulary/available');
+    return response.data;
+}
+
+export default { loadFile, compileFiles, getCurrentVocabSize, uploadFiles, getVocabSources, getAvailableVocabularies };
 
 

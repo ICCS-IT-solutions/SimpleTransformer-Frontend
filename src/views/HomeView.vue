@@ -7,61 +7,206 @@ import {
   BCardTitle,
   BCardText,
   BButton,
+  BBadge,
 } from "bootstrap-vue-next";
 </script>
 
 <template>
-  <div class="container py-5">
-    <section class="text-center mb-5">
-      <h1 class="display-4 fw-bold">SimpleTransformer</h1>
+  <div class="container-fluid px-4 py-5">
 
-      <p class="lead text-muted">Train, test and interact with your transformer model.</p>
+    <!-- Hero -->
+    <section class="text-center mb-5">
+      <div class="mb-3">
+        <i class="bi bi-cpu display-3"></i>
+      </div>
+
+      <h1 class="display-4 fw-bold mb-3">
+        SimpleTransformer
+      </h1>
+
+      <p class="lead text-muted mb-3">
+        A transformer model implementation and training environment
+        built entirely in C#.
+      </p>
+
+      <div class="d-flex justify-content-center align-items-center gap-2">
+        <BBadge variant="success">
+          <i class="bi bi-circle-fill me-1"></i>
+          Backend Online
+        </BBadge>
+
+        <BBadge variant="secondary">
+          CPU-SIMD
+        </BBadge>
+      </div>
     </section>
 
-    <BRow class="g-4">
-      <BCol md="6">
-        <BCard class="h-100">
-          <BCardBody>
-            <BCardTitle> Inference </BCardTitle>
 
-            <BCardText>
-              Send prompts to the model and inspect its predictions directly from your
-              browser.
+    <!-- Primary applications -->
+    <BRow class="g-4 mb-4">
+
+      <!-- Inference -->
+      <BCol lg="4" md="6">
+        <BCard class="h-100 shadow-sm">
+          <BCardBody class="d-flex flex-column">
+
+            <div class="feature-icon mb-3">
+              <i class="bi bi-chat-square-text"></i>
+            </div>
+
+            <BCardTitle>
+              Inference
+            </BCardTitle>
+
+            <BCardText class="text-muted">
+              Send prompts to the transformer and inspect generated
+              predictions directly from your browser.
             </BCardText>
 
-            <BButton :to="{ name: 'infer' }" variant="primary"> Open Inference </BButton>
+            <div class="mt-auto">
+              <BButton
+                :to="{ name: 'infer' }"
+                variant="primary"
+              >
+                <i class="bi bi-play-fill me-1"></i>
+                Open Inference
+              </BButton>
+            </div>
+
           </BCardBody>
         </BCard>
       </BCol>
 
-      <BCol md="6">
-        <BCard class="h-100">
-          <BCardBody>
-            <BCardTitle> Training </BCardTitle>
 
-            <BCardText>
-              Train the model using a file or live training data and monitor the training
-              process.
+      <!-- Training -->
+      <BCol lg="4" md="6">
+        <BCard class="h-100 shadow-sm">
+          <BCardBody class="d-flex flex-column">
+
+            <div class="feature-icon mb-3">
+              <i class="bi bi-graph-up-arrow"></i>
+            </div>
+
+            <BCardTitle>
+              Training
+            </BCardTitle>
+
+            <BCardText class="text-muted">
+              Configure and train the model using source files or
+              live training data while monitoring training progress.
             </BCardText>
 
-            <BButton :to="{ name: 'train' }" variant="success"> Open Training </BButton>
+            <div class="mt-auto">
+              <BButton
+                :to="{ name: 'train' }"
+                variant="success"
+              >
+                <i class="bi bi-play-fill me-1"></i>
+                Open Training
+              </BButton>
+            </div>
+
           </BCardBody>
         </BCard>
       </BCol>
 
-      <BCol md="6">
-        <BCard class="h-100">
-          <BCardBody>
-            <BCardTitle> Vocabulary Management </BCardTitle>
 
-            <BCardText>
-              Manage the vocabulary of the model and its embeddings.
+      <!-- Vocabulary -->
+      <BCol lg="4" md="6">
+        <BCard class="h-100 shadow-sm">
+          <BCardBody class="d-flex flex-column">
+
+            <div class="feature-icon mb-3">
+              <i class="bi bi-book"></i>
+            </div>
+
+            <BCardTitle>
+              Vocabulary
+            </BCardTitle>
+
+            <BCardText class="text-muted">
+              Upload training sources, compile vocabularies and
+              inspect the tokenizer configuration used by the model.
             </BCardText>
 
-            <BButton :to="{ name: 'vocab' }" variant="warning"> Open Vocabulary </BButton>
+            <div class="mt-auto">
+              <BButton
+                :to="{ name: 'vocab' }"
+                variant="warning"
+              >
+                <i class="bi bi-arrow-right me-1"></i>
+                Open Vocabulary
+              </BButton>
+            </div>
+
           </BCardBody>
         </BCard>
       </BCol>
+
     </BRow>
+
+
+    <!-- System overview -->
+    <BRow class="g-4">
+
+      <BCol lg="8">
+        <BCard class="h-100 shadow-sm">
+          <BCardBody>
+
+            <BCardTitle>
+              <i class="bi bi-activity me-2"></i>
+              Training Status
+            </BCardTitle>
+
+            <div class="text-muted py-3">
+              No active training job.
+            </div>
+
+          </BCardBody>
+        </BCard>
+      </BCol>
+
+
+      <BCol lg="4">
+        <BCard class="h-100 shadow-sm">
+          <BCardBody>
+
+            <BCardTitle>
+              <i class="bi bi-cpu me-2"></i>
+              Model
+            </BCardTitle>
+
+            <div class="small text-muted mb-1">
+              Configuration
+            </div>
+
+            <div class="fw-semibold mb-3">
+              Medium
+            </div>
+
+            <div class="small text-muted mb-1">
+              Acceleration
+            </div>
+
+            <div class="fw-semibold">
+              CPU-SIMD
+            </div>
+
+          </BCardBody>
+        </BCard>
+      </BCol>
+
+    </BRow>
+
   </div>
 </template>
+
+<style scoped>
+.feature-icon {
+  font-size: 2rem;
+}
+
+.feature-icon i {
+  opacity: 0.85;
+}
+</style>

@@ -11,9 +11,14 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    ConfigEditorModal: typeof import('./src/components/Modals/ConfigEditorModal.vue')['default']
     HelloWorld: typeof import('./src/components/HelloWorld.vue')['default']
+    ModelEditorModal: typeof import('./src/components/Modals/ModelEditorModal.vue')['default']
     Navbar: typeof import('./src/components/Navbar.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    TraininfConfigForm: typeof import('./src/components/Forms/TraininfConfigForm.vue')['default']
+    TrainingConfigForm: typeof import('./src/components/Forms/TrainingConfigForm.vue')['default']
+    TransformerConfigForm: typeof import('./src/components/Forms/TransformerConfigForm.vue')['default']
   }
 }

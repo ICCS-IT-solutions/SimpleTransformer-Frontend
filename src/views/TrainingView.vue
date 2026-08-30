@@ -1,40 +1,56 @@
+```vue
 <script lang="ts" setup>
 import {
-BContainer,
+  BContainer,
   BCard,
-  BCardBody,
   BCardHeader,
+  BCardBody,
+  BCardTitle,
   BRow,
   BCol,
   BButton,
   BForm,
-  BFormRadioGroup,
   BFormGroup,
   BFormInput,
   BFormTextarea,
   BFormSelect,
   BFormFile,
+  BFormRadioGroup,
   BTable,
   BTabs,
   BTab,
+  BBadge,
+  BProgress,
+  BProgressBar,
+  BAlert,
+  BListGroup,
+  BListGroupItem,
   type TableField,
 } from "bootstrap-vue-next";
+
 import trainingStore, {
   defaultAdamWTrainingConfig,
   defaultSgdTrainingConfig,
 } from "../stores/trainingStore";
+
 import { computed, ref, onMounted, onUnmounted } from "vue";
+
 import type { TrainingConfig } from "../services/TrainingConfig";
 import { OptimizerType } from "../services/OptimizerType";
 import { TrainingJobStatus } from "../services/TrainingJobStatus";
 import type { TrainingProgressResponse } from "../services/TrainingProgressResponse";
 
+const store = trainingStore();
+
 const liveInput = ref("");
 const trainingFileInput = ref<File | null>(null);
 const previousCheckpoint = ref("");
 const selectedConfig = ref("adamw");
+const isSubmitting = ref(false);
 
-const customConfig = ref(defaultAdamWTrainingConfig);
+const customConfig = ref<TrainingConfig>({
+  ...defaultAdamWTrainingConfig,
+});
 
 const optimizerOptions = [
   {
@@ -47,152 +63,100 @@ const optimizerOptions = [
   },
 ];
 
-var pollingTimer: ReturnType<typeof setInterval> | null = null;
-
-const refreshJobs = async () => {
-  await store.getTrainingJobs();
-};
-
-onUnmounted(() => {
-  stopJobPolling();
-});
-
-onMounted(() => {
-  refreshJobs();
-})
-
-const jobFields: TableField<TrainingProgressResponse>[] = [
-    {
-        key: "jobId",
-        label: "Job ID",
-    },
-    {
-        key: "status",
-        label: "Status",
-        formatter: ({ value }) => {
-        return TrainingJobStatus[value as TrainingJobStatus];
-        },
-    },
-    {
-        key: "currentEpoch",
-        label: "Epoch",
-        formatter: ({ value, item }) => {
-        return `${value} / ${item.totalEpochs}`;
-        },
-    },
-    {
-        key: "currentBatch",
-        label: "Batch",
-        formatter: ({ value, item }) => {
-        return `${value} / ${item.totalBatches / item.numSubBatches }`;
-        },
-    },
-    {
-      key: "numSubBatches",
-      label: "Sub-Batches",
-      formatter: ({ value }) => {
-        return `${value}`;
-      }
-    },
-    {
-      key: "currentSubBatch",
-      label: "Sub-Batch",
-      formatter: ({ value, item }) => {
-        return `${value} / ${item.numSubBatches}`;
-      }
-    },
-    {
-        key: "currentLoss",
-        label: "Loss",
-        formatter: ({ value }) => {
-        return Number(value).toFixed(6);
-        },
-    },
-    {
-        key: "message",
-        label: "Message",
-    },
-    {
-        key: "lastUpdatedAt",
-        label: "Updated",
-        formatter: ({ value }) => {
-        return new Date(value as string).toLocaleString();
-        },
-    },
-];
-
-const stopJobPolling = () => {
-  if (pollingTimer !== null) {
-    clearInterval(pollingTimer);
-    pollingTimer = null;
-  }
-};
-
-const isUndefinedOrEmpty = (value: number) =>
-{
-  return value === undefined || value === null || value === 0;
-}
-
 type TrainingConfigPreset = {
   label: string;
   value: string;
+  description: string;
   config: TrainingConfig;
 };
 
-const trainingConfigOptions: TrainingConfigPreset[] = [
-  {
-    label: "AdamW Default",
-    value: "adamw",
-    config: defaultAdamWTrainingConfig,
-  },
-  {
-    label: "SGD Default",
-    value: "sgd",
-    config: defaultSgdTrainingConfig,
-  },
-  {
+const getAdditionalConfigPresets = async () => {
+  return await store.getTrainingConfigs
+};
+
+onMounted(async () => {
+  await store.getModels();
+  await store.getVocabularies();
+  await getAdditionalConfigPresets();
+});
+
+const availableModels = computed(() =>
+  (store.availableModels ?? []).map(model => ({
+    value: model.entryId,
+    text: model.name,
+  }))
+);
+
+const availableVocabularies = computed(() =>
+  (store.availableVocabularies ?? []).map(vocabulary => ({
+    value: vocabulary.entryId,
+    text: vocabulary.name,
+  }))
+);
+
+const trainingConfigOptions = computed<TrainingConfigPreset[]>(() => {
+  const staticDefaults: TrainingConfigPreset[] = [
+    {
+      label: "AdamW Default",
+      value: "adamw",
+      description: "Recommended general-purpose Transformer configuration.",
+      config: defaultAdamWTrainingConfig,
+    },
+    {
+      label: "SGD Default",
+      value: "sgd",
+      description: "SGD with momentum and Nesterov acceleration.",
+      config: defaultSgdTrainingConfig,
+    },
+  ];
+
+  const customOption: TrainingConfigPreset = {
     label: "Custom",
     value: "custom",
-    config: defaultAdamWTrainingConfig,
-  },
-];
-const store = trainingStore();
+    description: "Configure the optimizer and training parameters manually.",
+    config: customConfig.value,
+  };
+
+  return [
+    ...staticDefaults,
+    ...additionalTrainingConfigPresets.value,
+    customOption,
+  ];
+});
+
+const additionalTrainingConfigPresets = computed<TrainingConfigPreset[]>(() => {
+  store.getTrainingConfigs();
+  const configEntries = store.trainingConfigResponse?.trainingConfigs;
+
+  if (!configEntries) return [];
+
+  return configEntries.map(entry => ({
+    label: entry.name,
+    value: entry.entryId ?? entry.name, // String ID for dropdown selection
+    description: entry.description,
+    config: { ...entry.config }, // Inner training parameters object
+  }));
+});
+
 
 const currentJobs = computed(() => store.currentJobs?.data ?? []);
 
-const reset = () => {
-  // Clear any pending request inputs.
-};
+const selectedPreset = computed(() =>
+  trainingConfigOptions.value.find(
+    (option: { value: string }) => option.value === selectedConfig.value
+  )
+);
 
-const getSelectedConfig = (): TrainingConfig | undefined => {
-  return trainingConfigOptions.find((option) => option.value === selectedConfig.value)
-    ?.config;
-};
-
-const trainFromLiveInput = () => {
-  const config = getSelectedConfig();
-
-  if (!config) {
-    return;
+const selectedTrainingConfig = computed<TrainingConfig>(() => {
+  if (selectedConfig.value === "custom") {
+    return customConfig.value;
   }
 
-  store.trainFromLiveInput(liveInput.value, JSON.stringify(config), previousCheckpoint.value);
-};
+  return selectedPreset.value?.config ?? defaultAdamWTrainingConfig;
+});
 
-const trainFromFile = () => {
-  const config = getSelectedConfig();
-
-  if (!config || !trainingFileInput.value) {
-    return;
-  }
-
-  // Depending on your backend design, you'll either
-  // upload trainingFileInput.value or extract an identifier.
-  store.trainFromFile(trainingFileInput.value, JSON.stringify(config), previousCheckpoint.value);
-};
-
-const hasActiveJobs = computed(() =>
-  currentJobs.value.some((job) =>
+const activeJobs = computed(() =>
+  currentJobs.value.filter(job =>
     [
       TrainingJobStatus.Pending,
       TrainingJobStatus.Running,
@@ -201,14 +165,118 @@ const hasActiveJobs = computed(() =>
   )
 );
 
-const startJobPolling = async () => {
-  await store.getTrainingJobs();
+const getStatusText = (status: TrainingJobStatus) => {
+  return TrainingJobStatus[status] ?? "Unknown";
+};
 
-  if (!hasActiveJobs.value) {
-    stopJobPolling();
+const getStatusVariant = (status: TrainingJobStatus) => {
+  switch (status) {
+    case TrainingJobStatus.Pending:
+      return "secondary";
+
+    case TrainingJobStatus.Started:
+    case TrainingJobStatus.Running:
+      return "primary";
+
+    default:
+      return "secondary";
   }
 };
 
+const getProgress = (job: TrainingProgressResponse) => {
+  if (!job.totalEpochs || job.totalEpochs <= 0) {
+    return 0;
+  }
+
+  return Math.min(
+    100,
+    Math.round((job.currentEpoch / job.totalEpochs) * 100)
+  );
+};
+
+const jobFields: TableField<TrainingProgressResponse>[] = [
+  {
+    key: "jobId",
+    label: "Job",
+  },
+  {
+    key: "status",
+    label: "Status",
+  },
+  {
+    key: "progress",
+    label: "Progress",
+  },
+  {
+    key: "currentEpoch",
+    label: "Epoch",
+  },
+  {
+    key: "currentBatch",
+    label: "Batch",
+  },
+  {
+    key: "currentLoss",
+    label: "Loss",
+    formatter: ({ value }) => Number(value).toFixed(6),
+  },
+  {
+    key: "lastUpdatedAt",
+    label: "Updated",
+    formatter: ({ value }) =>
+      new Date(value as string).toLocaleString(),
+  },
+];
+
+var pollingTimer: ReturnType<typeof setInterval> | null = null;
+var isPolling = false;
+
+
+const refreshJobs = async () => {
+  await store.getTrainingJobs();
+};
+
+const stopJobPolling = () => {
+  if (pollingTimer !== null) {
+    clearTimeout(pollingTimer);
+    pollingTimer = null;
+  }
+
+  isPolling = false;
+};
+
+const startJobPolling = async () => {
+  if (isPolling) {
+    return;
+  }
+
+  isPolling = true;
+
+  const poll = async () => {
+    if (!isPolling) {
+      return;
+    }
+
+    try {
+      await refreshJobs();
+
+      // Stop once there are no active jobs.
+      if (activeJobs.value.length === 0) {
+        stopJobPolling();
+        return;
+      }
+    } catch (error) {
+      console.error("Failed to poll training jobs:", error);
+    }
+
+    if (isPolling) {
+      pollingTimer = setTimeout(poll, 5000);
+    }
+  };
+
+  // Get the current state immediately.
+  await poll();
+};
 const handleTabChange = (event: {
   newTabId: string;
   prevTabId: string;
@@ -222,174 +290,644 @@ const handleTabChange = (event: {
     stopJobPolling();
   }
 };
+
+const trainFromLiveInput = async () => {
+  if (!liveInput.value.trim()) {
+    return;
+  }
+
+  isSubmitting.value = true;
+
+  try {
+    await store.trainFromLiveInput(
+      liveInput.value,
+      store.transformerModelId,
+      store.vocabularyId,
+      //Model and vocabulary ID's need to be passed here
+      previousCheckpoint.value
+    );
+
+    await startJobPolling();
+  } finally {
+    isSubmitting.value = false;
+  }
+};
+
+const trainFromFile = async () => {
+  if (!trainingFileInput.value) {
+    return;
+  }
+
+  isSubmitting.value = true;
+
+  try {
+    await store.trainFromFile(
+      trainingFileInput.value,
+      store.transformerModelId,
+      store.vocabularyId,
+      //Model and vocabulary ID's need to be passed here
+      previousCheckpoint.value
+    );
+
+    await startJobPolling();
+  } finally {
+    isSubmitting.value = false;
+  }
+};
+
+const reset = () => {
+  liveInput.value = "";
+  trainingFileInput.value = null;
+  previousCheckpoint.value = "";
+  selectedConfig.value = "adamw";
+
+  customConfig.value = {
+    ...defaultAdamWTrainingConfig,
+  };
+};
+
+onMounted(async () => {
+  await refreshJobs();
+});
+
+onUnmounted(() => {
+  stopJobPolling();
+});
 </script>
 
 <template>
   <BContainer fluid class="py-4">
     <BCard>
       <BCardHeader>
-        <div class="d-flex justify-content-between align-items-center">
-          <h3 class="mb-0">Training</h3>
+        <!-- Page heading -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <div>
+            
+            <h2 class="mb-1"><i class="bi bi-graph-up-arrow me-1"></i>Training</h2>
+            <p class="text-muted mb-0">
+              Create and monitor Transformer training jobs.
+            </p>
+          </div>
 
-          <BButton variant="outline-secondary" size="sm" @click="reset"> Reset </BButton>
+          <BButton
+            variant="outline-secondary"
+            @click="reset"
+          >
+            Reset
+          </BButton>
         </div>
       </BCardHeader>
-
       <BCardBody>
-        <BTabs @activate-tab="handleTabChange">
-          <BTab id="live-input" title="Live Input">
-            <BForm @submit.prevent="trainFromLiveInput">
-              <BFormGroup
-                label="Train from live input"
-                label-for="live-input"
-                class="mb-3"
-              >
-                <BFormTextarea
-                  id="live-input"
-                  v-model="liveInput"
-                  rows="6"
-                  placeholder="Enter text for the model..."
-                />
-              </BFormGroup>
-              <!--Configuration-->
-              <BFormGroup label="Configuration" label-for="configuration" class="mb-3">
-                <BFormSelect
-                  id="configuration"
-                  v-model="selectedConfig"
-                  :options="trainingConfigOptions"
-                  text-field="label"
-                  value-field="value"
-                />
-              </BFormGroup>
-              <BFormGroup
-                label="Previous Checkpoint"
-                label-for="checkpoint"
-                class="mb-3"
-                description="Leave empty to start a new training session."
-              >
-                <BFormInput id="checkpoint" v-model="previousCheckpoint" type="text" />
-              </BFormGroup>
-              <BFormGroup class="mb-3">
-                <BButton type="submit" variant="primary">Train with this input</BButton>
-                <BButton type="reset" variant="secondary">Cancel</BButton>
-              </BFormGroup>
-            </BForm>
-          </BTab>
-          <BTab id="file-input" title="File Input">
-            <BForm @submit.prevent="trainFromFile">
-              <BFormGroup label="Train from file" label-for="file" class="mb-3">
-                <!--Use a file input element to select a file-->
-                <BFormFile
-                  id="training-file"
-                  v-model="trainingFileInput"
-                  accept=".txt"
-                  browse-text="Browse"
-                />
-              </BFormGroup>
-              <!--Configuration-->
-              <BFormGroup label="Configuration" label-for="configuration" class="mb-3">
-                <BFormSelect
-                  id="configuration"
-                  v-model="selectedConfig"
-                  :options="trainingConfigOptions"
-                  text-field="label"
-                  value-field="value"
-                />
-              </BFormGroup>
-              <!--Previous checkpoint-->
-              <BFormGroup
-                label="Previous Checkpoint"
-                label-for="checkpoint"
-                class="mb-3"
-                description="Leave empty to start a new training session."
-              >
-                <BFormInput id="checkpoint" v-model="previousCheckpoint" type="text" />
-              </BFormGroup>
-              <BFormGroup class="mb-3">
-                <BButton type="submit" variant="primary">Train with this file</BButton>
-                <BButton type="reset" variant="secondary">Cancel</BButton>
-              </BFormGroup>
-            </BForm>
-          </BTab>
+        <!-- Active jobs summary -->
+        <BAlert
+          v-if="activeJobs.length > 0"
+          variant="primary"
+          show
+          class="mb-4"
+        >
+          <strong>{{ activeJobs.length }}</strong>
+          training job{{ activeJobs.length === 1 ? "" : "s" }}
+          currently running.
+        </BAlert>
 
-          <BTab id="training-jobs" title="Training jobs">
-            <BRow>
-              <BButton @click="refreshJobs">Refresh</BButton>
+        <BTabs
+          content-class="mt-3"
+          @activate-tab="handleTabChange"
+        >
+
+          <!-- ====================================================== -->
+          <!-- LIVE INPUT                                             -->
+          <!-- ====================================================== -->
+
+          <BTab
+            id="live-input"
+            title="Live Training"
+          >
+            <BRow class="g-4">
+
+              <BCol lg="8">
+                <BCard class="h-100">
+                  <BCardHeader>
+                    <BCardTitle class="mb-0">
+                      Train from live input
+                    </BCardTitle>
+                  </BCardHeader>
+
+                  <BCardBody>
+                    <BForm @submit.prevent="trainFromLiveInput">
+
+                      <BFormGroup
+                        label="Training data"
+                        label-for="live-input"
+                        description="Enter text that will be supplied to the training pipeline."
+                        class="mb-4"
+                      >
+                        <BFormTextarea
+                          id="live-input"
+                          v-model="liveInput"
+                          rows="12"
+                          placeholder="Enter training text..."
+                        />
+                      </BFormGroup>
+                      <!-- Model selector -->
+                      <BFormGroup
+                        label="Model"
+                        label-for="model-selector"
+                        class="mb-3"
+                      >
+                        <BFormSelect
+                          id="model-selector"
+                          v-model="store.transformerModelId"
+                          :options="availableModels"
+                        />
+                    </BFormGroup>
+                    <!--Vocab selector -->
+                    <BFormGroup
+                        label="Vocab"
+                        label-for="vocab-selector"
+                        class="mb-3"
+                      >
+                        <BFormSelect
+                          id="vocab-selector"
+                          v-model="store.vocabularyId"
+                          :options="availableVocabularies"
+                        />
+                    </BFormGroup>
+
+                      <BRow>
+                        <BCol md="6">
+                          <BFormGroup
+                            label="Previous checkpoint"
+                            label-for="live-checkpoint"
+                            description="Optional. Leave empty to start from scratch."
+                            class="mb-3"
+                          >
+                            <BFormInput
+                              id="live-checkpoint"
+                              v-model="previousCheckpoint"
+                              placeholder="Checkpoint ID"
+                            />
+                          </BFormGroup>
+                        </BCol>
+                      </BRow>
+
+                      <div class="d-flex justify-content-end gap-2 mt-3">
+                        <BButton
+                          type="button"
+                          variant="secondary"
+                          @click="reset"
+                        >
+                          Clear
+                        </BButton>
+
+                        <BButton
+                          type="submit"
+                          variant="primary"
+                          :disabled="!liveInput.trim() || isSubmitting"
+                        >
+                          {{ isSubmitting ? "Starting..." : "Start Training" }}
+                        </BButton>
+                      </div>
+
+                    </BForm>
+                  </BCardBody>
+                </BCard>
+              </BCol>
+
+              <!-- Configuration summary -->
+              <BCol lg="4">
+                <BCard class="h-100">
+                  <BCardHeader>
+                    <BCardTitle class="mb-0">
+                      Configuration
+                    </BCardTitle>
+                  </BCardHeader>
+
+                  <BCardBody>
+
+                    <h5>
+                      {{ selectedPreset?.label }}
+                    </h5>
+
+                    <p class="text-muted">
+                      {{ selectedPreset?.description }}
+                    </p>
+
+                    <BListGroup flush>
+                      <BListGroupItem
+                        class="d-flex justify-content-between px-0"
+                      >
+                        <span>Optimizer</span>
+                        <strong>
+                          {{ OptimizerType[selectedTrainingConfig.optimizer] }}
+                        </strong>
+                      </BListGroupItem>
+
+                      <BListGroupItem
+                        class="d-flex justify-content-between px-0"
+                      >
+                        <span>Learning rate</span>
+                        <strong>
+                          {{ selectedTrainingConfig.learningRate }}
+                        </strong>
+                      </BListGroupItem>
+
+                      <BListGroupItem
+                        class="d-flex justify-content-between px-0"
+                      >
+                        <span>Batch size</span>
+                        <strong>
+                          {{ selectedTrainingConfig.batchSize }}
+                        </strong>
+                      </BListGroupItem>
+
+                      <BListGroupItem
+                        class="d-flex justify-content-between px-0"
+                      >
+                        <span>Epochs</span>
+                        <strong>
+                          {{ selectedTrainingConfig.epochs }}
+                        </strong>
+                      </BListGroupItem>
+
+                      <BListGroupItem
+                        class="d-flex justify-content-between px-0"
+                      >
+                        <span>Dropout</span>
+                        <strong>
+                          {{ selectedTrainingConfig.dropoutRate }}
+                        </strong>
+                      </BListGroupItem>
+                    </BListGroup>
+
+                    <BButton
+                      v-if="selectedConfig === 'custom'"
+                      variant="outline-primary"
+                      class="w-100 mt-4"
+                      href="#custom-training-config"
+                    >
+                      Edit Configuration
+                    </BButton>
+
+                  </BCardBody>
+                </BCard>
+              </BCol>
+
             </BRow>
-            <!--While this tab is active, start polling for training jobs-->
-            <BTable
-              v-if="currentJobs.length > 0"
-              :items="currentJobs"
-              :fields="jobFields"
-              responsive
-              striped
-              hover
-            />
-            <p v-else>No training jobs found.</p>
           </BTab>
+
+          <!-- ====================================================== -->
+          <!-- FILE INPUT                                             -->
+          <!-- ====================================================== -->
+
+          <BTab
+            id="file-input"
+            title="File Training"
+          >
+            <BRow class="g-4">
+
+              <BCol lg="8">
+                <BCard>
+                  <BCardHeader>
+                    <BCardTitle class="mb-0">
+                      Train from file
+                    </BCardTitle>
+                  </BCardHeader>
+
+                  <BCardBody>
+                    <BForm @submit.prevent="trainFromFile">
+
+                      <BFormGroup
+                        label="Training file"
+                        label-for="training-file"
+                        description="Select a plain text training corpus."
+                        class="mb-4"
+                      >
+                        <BFormFile
+                          id="training-file"
+                          v-model="trainingFileInput"
+                          accept=".txt"
+                          browse-text="Browse"
+                        />
+                      </BFormGroup>
+                      <!-- Model selector -->
+                      <BFormGroup
+                        label="Model"
+                        label-for="model-selector"
+                        class="mb-3"
+                      >
+                        <BFormSelect
+                          id="model-selector"
+                          v-model="store.transformerModelId"
+                          :options="availableModels"
+                        />
+                    </BFormGroup> 
+                    <!--Vocab selector -->
+                    <BFormGroup
+                        label="Vocab"
+                        label-for="vocab-selector"
+                        class="mb-3"
+                      >
+                        <BFormSelect
+                          id="vocab-selector"
+                          v-model="store.vocabularyId"
+                          :options="availableVocabularies"
+                        />
+                    </BFormGroup>                     
+
+                      <BFormGroup
+                        label="Previous checkpoint"
+                        label-for="file-checkpoint"
+                        description="Optional. Specify a checkpoint to resume training."
+                        class="mb-4"
+                      >
+                        <BFormInput
+                          id="file-checkpoint"
+                          v-model="previousCheckpoint"
+                          placeholder="Checkpoint ID"
+                        />
+                      </BFormGroup>
+
+                      <div class="d-flex justify-content-end gap-2">
+                        <BButton
+                          type="button"
+                          variant="secondary"
+                          @click="reset"
+                        >
+                          Clear
+                        </BButton>
+
+                        <BButton
+                          type="submit"
+                          variant="primary"
+                          :disabled="!trainingFileInput || isSubmitting"
+                        >
+                          {{ isSubmitting ? "Starting..." : "Start Training" }}
+                        </BButton>
+                      </div>
+
+                    </BForm>
+                  </BCardBody>
+                </BCard>
+              </BCol>
+
+              <BCol lg="4">
+                <BCard>
+                  <BCardHeader>
+                    <BCardTitle class="mb-0">
+                      Selected configuration
+                    </BCardTitle>
+                  </BCardHeader>
+
+                  <BCardBody>
+                    <h5>{{ selectedPreset?.label }}</h5>
+
+                    <p class="text-muted">
+                      {{ selectedPreset?.description }}
+                    </p>
+
+                    <small class="text-muted">
+                      Learning rate
+                    </small>
+                    <div class="mb-3">
+                      <strong>
+                        {{ selectedTrainingConfig.learningRate }}
+                      </strong>
+                    </div>
+
+                    <small class="text-muted">
+                      Batch size
+                    </small>
+                    <div class="mb-3">
+                      <strong>
+                        {{ selectedTrainingConfig.batchSize }}
+                      </strong>
+                    </div>
+
+                    <small class="text-muted">
+                      Epochs
+                    </small>
+                    <div>
+                      <strong>
+                        {{ selectedTrainingConfig.epochs }}
+                      </strong>
+                    </div>
+                  </BCardBody>
+                </BCard>
+              </BCol>
+
+            </BRow>
+          </BTab>
+
+          <!-- ====================================================== -->
+          <!-- TRAINING JOBS                                          -->
+          <!-- ====================================================== -->
+
+          <BTab
+            id="training-jobs"
+            title="Training Jobs"
+          >
+            <BCard>
+              <BCardHeader>
+                <div class="d-flex justify-content-between align-items-center">
+                  <div>
+                    <BCardTitle class="mb-0">
+                      Training Jobs
+                    </BCardTitle>
+
+                    <small class="text-muted">
+                      Monitor active and completed training jobs.
+                    </small>
+                  </div>
+
+                  <BButton
+                    variant="outline-primary"
+                    size="sm"
+                    @click="refreshJobs"
+                  >
+                    Refresh
+                  </BButton>
+                </div>
+              </BCardHeader>
+
+              <BCardBody class="p-0">
+
+                <BTable
+                  v-if="currentJobs.length > 0"
+                  :items="currentJobs"
+                  :fields="jobFields"
+                  responsive
+                  striped
+                  hover
+                  class="mb-0"
+                >
+
+                  <template #cell(status)="{ item }">
+                    <BBadge :variant="getStatusVariant(item.status)">
+                      {{ getStatusText(item.status) }}
+                    </BBadge>
+                  </template>
+
+                  <template #cell(progress)="{ item }">
+                    <div style="min-width: 140px">
+                      <BProgress height="8px">
+                        <BProgressBar
+                          :value="getProgress(item)"
+                        />
+                      </BProgress>
+
+                      <small class="text-muted">
+                        {{ getProgress(item) }}%
+                      </small>
+                    </div>
+                  </template>
+
+                  <template #cell(currentEpoch)="{ item }">
+                    {{ item.currentEpoch }} / {{ item.totalEpochs }}
+                  </template>
+
+                  <template #cell(currentBatch)="{ item }">
+                    {{ item.currentBatch }} / {{ item.totalBatches }}
+                  </template>
+
+                </BTable>
+
+                <div
+                  v-else
+                  class="text-center text-muted py-5"
+                >
+                  <h5>No training jobs</h5>
+
+                  <p class="mb-0">
+                    Start a training job using the Live Training or File Training tabs.
+                  </p>
+                </div>
+
+              </BCardBody>
+            </BCard>
+          </BTab>
+
         </BTabs>
+
+        <!-- ====================================================== -->
+        <!-- CUSTOM CONFIGURATION                                   -->
+        <!-- ====================================================== -->
+
+        <BCard
+          v-if="selectedConfig === 'custom'"
+          id="custom-training-config"
+          class="mt-4"
+        >
+          <BCardHeader>
+            <BCardTitle class="mb-0">
+              Custom Training Configuration
+            </BCardTitle>
+          </BCardHeader>
+
+          <BCardBody>
+
+            <p class="text-muted">
+              Override the standard training parameters for this training run.
+            </p>
+
+            <BFormGroup
+              label="Optimizer"
+              class="mb-4"
+            >
+              <BFormRadioGroup
+                v-model="customConfig.optimizer"
+                :options="optimizerOptions"
+                name="optimizer"
+              />
+            </BFormGroup>
+
+            <BRow>
+
+              <BCol md="6">
+
+                <BFormGroup
+                  label="Learning Rate"
+                  class="mb-3"
+                >
+                  <BFormInput
+                    v-model.number="customConfig.learningRate"
+                    type="number"
+                    min="0"
+                    step="0.0001"
+                  />
+                </BFormGroup>
+
+                <BFormGroup
+                  label="Batch Size"
+                  class="mb-3"
+                >
+                  <BFormInput
+                    v-model.number="customConfig.batchSize"
+                    type="number"
+                    min="1"
+                  />
+                </BFormGroup>
+
+                <BFormGroup
+                  label="Epochs"
+                  class="mb-3"
+                >
+                  <BFormInput
+                    v-model.number="customConfig.epochs"
+                    type="number"
+                    min="1"
+                  />
+                </BFormGroup>
+
+              </BCol>
+
+              <BCol md="6">
+
+                <BFormGroup
+                  label="Dropout Rate"
+                  class="mb-3"
+                >
+                  <BFormInput
+                    v-model.number="customConfig.dropoutRate"
+                    type="number"
+                    min="0"
+                    max="0.99"
+                    step="0.1"
+                  />
+                </BFormGroup>
+
+                <BFormGroup
+                  label="Weight Decay"
+                  class="mb-3"
+                >
+                  <BFormInput
+                    v-model.number="customConfig.weightDecay"
+                    type="number"
+                    min="0"
+                    step="0.0001"
+                  />
+                </BFormGroup>
+
+                <BFormGroup
+                  label="Maximum Gradient Norm"
+                  class="mb-3"
+                >
+                  <BFormInput
+                    v-model.number="customConfig.maxGradientNorm"
+                    type="number"
+                    min="0"
+                  />
+                </BFormGroup>
+
+              </BCol>
+
+            </BRow>
+
+          </BCardBody>
+        </BCard>
       </BCardBody>
     </BCard>
-    <BCard v-if="selectedConfig === 'custom'" class="mt-4">
-      <BCardHeader> Custom Training Configuration </BCardHeader>
 
-      <BCardBody>
-        <BFormGroup label="Optimizer">
-          <BFormRadioGroup
-            v-model="customConfig.Optimizer"
-            :options="optimizerOptions"
-            name="optimizer"
-          />
-        </BFormGroup>
-        <BRow>
-          <BCol md="6">
-            <BFormGroup label="Learning Rate">
-              <BFormInput
-                v-model.number="customConfig.LearningRate"
-                type="number"
-                min="0"
-                step="0.0001"
-              />
-            </BFormGroup>
-            <!--Epochs-->
-            <BFormGroup label="Epochs">
-              <BFormInput v-model.number="customConfig.Epochs" type="number" min="1" />
-            </BFormGroup>
-            <!--Dropout Rate-->
-            <BFormGroup label="Dropout Rate">
-              <BFormInput
-                v-model.number="customConfig.DropoutRate"
-                type="number"
-                min="0"
-                step="0.1"
-              />
-            </BFormGroup>
-          </BCol>
-
-          <BCol md="6">
-            <BFormGroup label="Batch Size">
-              <BFormInput v-model.number="customConfig.BatchSize" type="number" min="1" />
-            </BFormGroup>
-            <!--Gradient Clipping-->
-            <BFormGroup label="Max Gradient Norm">
-              <BFormInput
-                v-model.number="customConfig.MaxGradientNorm"
-                type="number"
-                min="0"
-              />
-            </BFormGroup>
-            <!--Weight Decay-->
-            <BFormGroup label="Weight Decay">
-              <BFormInput
-                v-model.number="customConfig.WeightDecay"
-                type="number"
-                min="0"
-                step="0.0001"
-              />
-            </BFormGroup>
-          </BCol>
-        </BRow>
-      </BCardBody>
-    </BCard>
   </BContainer>
 </template>
+```
