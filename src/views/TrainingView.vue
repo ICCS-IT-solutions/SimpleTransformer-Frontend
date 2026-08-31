@@ -70,14 +70,44 @@ type TrainingConfigPreset = {
   config: TrainingConfig;
 };
 
-const getAdditionalConfigPresets = async () => {
-  return await store.getTrainingConfigs
-};
+var refreshTimer: string | number | NodeJS.Timeout | null | undefined = null;
+
+const refreshAll = async () => {
+  await store.getModels();
+  await store.getTrainingConfigs();
+  await store.getVocabularies();
+  await store.getTrainingJobs();
+}
+
+const resumeJob = async (jobId:string) => {
+  await store.resumeTrainingJob(jobId);
+}
+
+const pauseJob = async (jobId:string) => {
+  await store.pauseTrainingJob(jobId);
+}
+
+const stopJob = async (jobId:string) => {
+  await store.stopTrainingJob(jobId);
+}
+
+const startJob = async (jobId:string) => {
+  await store.startTrainingJob(jobId);
+}
+
+const cancelJob = async (jobId:string) => {
+  await store.cancelTrainingJob(jobId);
+}
 
 onMounted(async () => {
-  await store.getModels();
-  await store.getVocabularies();
-  await getAdditionalConfigPresets();
+  await refreshAll();
+  setTimeout(async () => refreshTimer, 5000);
+});
+
+onUnmounted(async () => {
+  if(refreshTimer) {
+    clearTimeout(refreshTimer);
+  };
 });
 
 const availableModels = computed(() =>
@@ -125,19 +155,17 @@ const trainingConfigOptions = computed<TrainingConfigPreset[]>(() => {
 });
 
 const additionalTrainingConfigPresets = computed<TrainingConfigPreset[]>(() => {
-  store.getTrainingConfigs();
   const configEntries = store.trainingConfigResponse?.trainingConfigs;
 
   if (!configEntries) return [];
 
   return configEntries.map(entry => ({
     label: entry.name,
-    value: entry.entryId ?? entry.name, // String ID for dropdown selection
+    value: entry.entryId ?? entry.name,
     description: entry.description,
-    config: { ...entry.config }, // Inner training parameters object
+    config: { ...entry.config },
   }));
 });
-
 
 const currentJobs = computed(() => store.currentJobs?.data ?? []);
 
@@ -196,7 +224,7 @@ const getProgress = (job: TrainingProgressResponse) => {
 
 const jobFields: TableField<TrainingProgressResponse>[] = [
   {
-    key: "jobId",
+    key: "name",
     label: "Job",
   },
   {
@@ -226,57 +254,12 @@ const jobFields: TableField<TrainingProgressResponse>[] = [
     formatter: ({ value }) =>
       new Date(value as string).toLocaleString(),
   },
+  {
+    key: "actions",
+    label: "Actions",
+  },
 ];
 
-var pollingTimer: ReturnType<typeof setInterval> | null = null;
-var isPolling = false;
-
-
-const refreshJobs = async () => {
-  await store.getTrainingJobs();
-};
-
-const stopJobPolling = () => {
-  if (pollingTimer !== null) {
-    clearTimeout(pollingTimer);
-    pollingTimer = null;
-  }
-
-  isPolling = false;
-};
-
-const startJobPolling = async () => {
-  if (isPolling) {
-    return;
-  }
-
-  isPolling = true;
-
-  const poll = async () => {
-    if (!isPolling) {
-      return;
-    }
-
-    try {
-      await refreshJobs();
-
-      // Stop once there are no active jobs.
-      if (activeJobs.value.length === 0) {
-        stopJobPolling();
-        return;
-      }
-    } catch (error) {
-      console.error("Failed to poll training jobs:", error);
-    }
-
-    if (isPolling) {
-      pollingTimer = setTimeout(poll, 5000);
-    }
-  };
-
-  // Get the current state immediately.
-  await poll();
-};
 const handleTabChange = (event: {
   newTabId: string;
   prevTabId: string;
@@ -285,9 +268,7 @@ const handleTabChange = (event: {
   event: unknown;
 }) => {
   if (event.newTabId === "training-jobs") {
-    startJobPolling();
-  } else {
-    stopJobPolling();
+
   }
 };
 
@@ -299,7 +280,7 @@ const trainFromLiveInput = async () => {
   isSubmitting.value = true;
 
   try {
-    await store.trainFromLiveInput(
+    await store.createJob(
       liveInput.value,
       store.transformerModelId,
       store.vocabularyId,
@@ -307,7 +288,6 @@ const trainFromLiveInput = async () => {
       previousCheckpoint.value
     );
 
-    await startJobPolling();
   } finally {
     isSubmitting.value = false;
   }
@@ -321,7 +301,7 @@ const trainFromFile = async () => {
   isSubmitting.value = true;
 
   try {
-    await store.trainFromFile(
+    await store.createJobFromFile(
       trainingFileInput.value,
       store.transformerModelId,
       store.vocabularyId,
@@ -329,7 +309,6 @@ const trainFromFile = async () => {
       previousCheckpoint.value
     );
 
-    await startJobPolling();
   } finally {
     isSubmitting.value = false;
   }
@@ -346,13 +325,10 @@ const reset = () => {
   };
 };
 
-onMounted(async () => {
-  await refreshJobs();
-});
 
-onUnmounted(() => {
-  stopJobPolling();
-});
+
+
+
 </script>
 
 <template>
@@ -743,7 +719,7 @@ onUnmounted(() => {
                   <BButton
                     variant="outline-primary"
                     size="sm"
-                    @click="refreshJobs"
+                    @click="store.getTrainingJobs()"
                   >
                     Refresh
                   </BButton>
@@ -789,6 +765,50 @@ onUnmounted(() => {
                   <template #cell(currentBatch)="{ item }">
                     {{ item.currentBatch }} / {{ item.totalBatches }}
                   </template>
+                  <!--Pause, resume and cancel buttons -->
+
+                  <template #cell(actions)="{ item }">
+                    <div class="d-flex justify-content-end gap-2">
+                    <BButton 
+                      variant="outline-primary"
+                      size="sm"
+                      @click="startJob(item.jobId)"
+                      >
+                        <i class="bi bi-play-circle me-1"></i>
+                        Start
+                      </BButton>
+                    <BButton
+                      variant="outline-primary"
+                      size="sm"
+                      @click="pauseJob(item.jobId)"
+                    >
+                      <i class="bi bi-pause-circle me-1"></i>
+                      Pause
+                    </BButton>
+                      <BButton
+                        variant="outline-primary"
+                        size="sm"
+                        @click="resumeJob(item.jobId)"
+                      >
+                        <i class="bi bi-play-circle me-1"></i>
+                        Resume
+                      </BButton>
+                      <BButton variant ="outline-danger" size="sm" @click="stopJob(item.jobId)">
+                        <i class="bi bi-stop-circle me-1"></i>
+                        Stop
+                      </BButton>
+                      <BButton
+                        variant="outline-danger"
+                        size="sm"
+                        @click="cancelJob(item.jobId)"
+                      >
+                        <i class="bi bi-x-circle me-1"></i>
+                        Cancel
+                      </BButton>
+                    </div>
+                  </template>
+
+
 
                 </BTable>
 

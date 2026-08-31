@@ -14,3 +14,4 @@ export enum TokenizerType {
     Bpe,
     SentencePiece
 }
+

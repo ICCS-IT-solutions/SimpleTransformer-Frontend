@@ -5,7 +5,7 @@ import type { TrainingProgressResponse } from "./TrainingProgressResponse";
 import type { TrainingRequest } from "./TrainingRequest";
 import type { TrainingResponse } from "./TrainingResponse"
 
-const trainFromFile = async (req: TrainingFileRequest): Promise<ApiResponse<TrainingResponse>> => {
+const createJobFromFile = async (req: TrainingFileRequest): Promise<ApiResponse<TrainingResponse>> => {
 
     const formData = new FormData();
 
@@ -27,7 +27,7 @@ const trainFromFile = async (req: TrainingFileRequest): Promise<ApiResponse<Trai
     return response.data;
 }
 
-const trainFromLiveInput = async (req: TrainingRequest): Promise<ApiResponse<TrainingResponse>> => {
+const createJob = async (req: TrainingRequest): Promise<ApiResponse<TrainingResponse>> => {
 
     var response = await axiosClient.post('/train/live', req );
     return response.data;
@@ -68,4 +68,48 @@ const cancelTrainingJob = async (
   return response.data;
 };
 
-export default { trainFromFile, trainFromLiveInput, getTrainingProgress, getTrainingJobs, pauseTrainingJob, resumeTrainingJob, cancelTrainingJob };
+const stopTrainingJob = async (
+  jobId: string
+): Promise<ApiResponse<TrainingResponse>> => {
+  const response = await axiosClient.post(`/train/jobs/${jobId}/stop`);
+
+  return response.data;
+};
+//Not yet used but I do intend to use them in the store.
+const startTrainingJob = async (
+  jobId: string
+): Promise<ApiResponse<TrainingResponse>> => {
+  const response = await axiosClient.post(`/train/jobs/${jobId}/start`);
+
+  return response.data;
+};
+
+const deleteTrainingJob = async (
+  jobId: string
+): Promise<ApiResponse<TrainingResponse>> => {
+  const response = await axiosClient.post(`/train/jobs/${jobId}/delete`);
+
+  return response.data;
+};
+
+const resetTrainingJob = async (
+  jobId: string
+): Promise<ApiResponse<TrainingResponse>> => {
+  const response = await axiosClient.post(`/train/jobs/${jobId}/reset`);
+
+  return response.data;
+};
+
+export default { 
+  createJobFromFile, 
+  createJob, 
+  getTrainingProgress, 
+  getTrainingJobs, 
+  pauseTrainingJob, 
+  resumeTrainingJob, 
+  cancelTrainingJob, 
+  stopTrainingJob,
+  startTrainingJob,
+  deleteTrainingJob,
+  resetTrainingJob
+};

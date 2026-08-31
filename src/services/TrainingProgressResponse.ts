@@ -3,6 +3,7 @@ import type { TrainingJobStatus } from "./TrainingJobStatus";
 
 export type TrainingProgressResponse = {
     jobId: string;
+    name: string;
     status: TrainingJobStatus;
     currentEpoch: number;
     totalEpochs: number;

@@ -3,6 +3,7 @@
 export enum TrainingJobStatus {
     Pending,
     Started,
+    Stopped,
     Paused,
     Running,
     Completed,

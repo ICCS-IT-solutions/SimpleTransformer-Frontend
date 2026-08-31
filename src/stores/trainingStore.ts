@@ -70,7 +70,7 @@ const defaultState: TrainingStoreState = {
     transformerModelId: '',
     vocabularyId: '',
     trainingResponse: null,
-    
+
     currentJobs: null,
     currentJob: null,
 
@@ -92,7 +92,7 @@ const defaultState: TrainingStoreState = {
 const trainingStore = defineStore('trainingStore', {
     state: () => defaultState,
     actions: {
-        async trainFromFile(file: File, transformerModelId: string, vocabularyId: string, previousCheckpoint: string = "") {
+        async createJobFromFile(file: File, transformerModelId: string, vocabularyId: string, previousCheckpoint: string = "") {
             if(file === null) return;
 
             this.transformerModelId = transformerModelId;
@@ -110,11 +110,11 @@ const trainingStore = defineStore('trainingStore', {
                 previousCheckpointId: ''
             };
             
-            const response = await trainingService.trainFromFile(req);
+            const response = await trainingService.createJobFromFile(req);
 
             this.trainingResponse = response;
         },
-        async trainFromLiveInput(input: string,  transformerModelId: string, vocabularyId: string,  previousCheckpoint: string = "") {
+        async createJob(input: string,  transformerModelId: string, vocabularyId: string,  previousCheckpoint: string = "") {
             if(input === '') return; //For now return on empty. Better yet would be to show a notification.
 
             this.transformerModelId = transformerModelId;
@@ -132,7 +132,7 @@ const trainingStore = defineStore('trainingStore', {
                 previousCheckpointId: ''
             };
 
-            const response = await trainingService.trainFromLiveInput(req);
+            const response = await trainingService.createJob(req);
             this.trainingResponse = response;
         },
         async getTrainingProgress (jobId: string) {
@@ -159,7 +159,24 @@ const trainingStore = defineStore('trainingStore', {
             if (res.data) {
                 this.availableVocabularies = res.data.vocabularies ?? [];
             }
-        }
+        },
+        //Pause, resume, stop and cancel handlers
+        async pauseTrainingJob(jobId: string) {
+            await trainingService.pauseTrainingJob(jobId);
+        },
+        async resumeTrainingJob(jobId: string) {
+            await trainingService.resumeTrainingJob(jobId);
+        },
+        async stopTrainingJob(jobId: string) {
+            await trainingService.stopTrainingJob(jobId);
+        },
+        async cancelTrainingJob(jobId: string) {
+            await trainingService.cancelTrainingJob(jobId);
+        },
+        async startTrainingJob(jobId: string) {
+            await trainingService.startTrainingJob(jobId);
+        },
+
     }
 });
 
