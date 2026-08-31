@@ -67,4 +67,5 @@ const cancelTrainingJob = async (
 
   return response.data;
 };
+
 export default { trainFromFile, trainFromLiveInput, getTrainingProgress, getTrainingJobs, pauseTrainingJob, resumeTrainingJob, cancelTrainingJob };

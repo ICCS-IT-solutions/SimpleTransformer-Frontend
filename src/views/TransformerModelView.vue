@@ -13,6 +13,7 @@ import transformerModelStore from "../stores/transformerModelStore";
 import configStore from "../stores/configStore";
 import type { TransformerModelEntry } from "../services/TransformerModelEntry";
 import type { CreateTransformerModelRequest } from "../services/CreateTransformerModelRequest";
+import { useDateFormat, useNow } from "@vueuse/core";
 
 const store = transformerModelStore();
 const configs = configStore();
@@ -25,6 +26,8 @@ const availableTrainingConfigs = computed(
   () => configs.trainingConfigResponse?.trainingConfigs ?? []
 );
 
+
+
 const showModelEditor = ref(false);
 
 const openModelEditor = () => {
@@ -35,6 +38,7 @@ const defaultTransformerModelEntry = (): TransformerModelEntry => ({
     entryId: "",
     name: "",
     description: "",
+    isLoaded: false,
     transformerConfigId: "",
     trainingConfigId: "",
     dateCreated: new Date(),
@@ -82,7 +86,7 @@ const viewModel = async (modelId: string) => {
 }
 
 const loadModel = async (modelId: string) => {
-    
+    await store.loadModel(modelId);
 }
 
 const refresh = async () => {
@@ -100,6 +104,11 @@ const modelFields: TableField[] = [
     label: "Description",
   },
   {
+    key: "isLoaded",
+    label: "Loaded",
+  },
+  //Use the actual config names here. I will need to either compute these or pass them out from the backend
+  {
     key: "transformerConfigId",
     label: "Model Config",
   },
@@ -110,13 +119,24 @@ const modelFields: TableField[] = [
   {
     key: "dateCreated",
     label: "Created",
-    formatter: (value: any) => new Date(value).toLocaleString(),
+    formatter: ({ value }) => useDateFormat(value as string, "DD/MM/YYYY").value
+
   },
   {
     key: "dateUpdated",
     label: "Updated",
-    formatter: (value: any) =>
-      value ? new Date(value).toLocaleString() : "Never",
+    formatter: ({ value }) => {
+      if (
+        value === null ||
+        value === undefined ||
+        value === "" ||
+        Number.isNaN(new Date(value as string).getTime())
+      ) {
+        return "Never";
+      }
+
+      return useDateFormat(value as string, "DD/MM/YYYY").value;
+    },
   },
   {
     key: "actions",

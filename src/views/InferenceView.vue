@@ -17,8 +17,14 @@ import {
 } from "bootstrap-vue-next";
 import { computed, onMounted, ref } from "vue";
 import inferenceStore from "../stores/inferenceStore";
+import transformerModelStore from "../stores/transformerModelStore";
 
 const store = inferenceStore();
+const modelStore = transformerModelStore();
+
+const loadedModel = computed(
+  () => modelStore.models.find((m) => m.isLoaded)
+);
 
 const showAdvanced = ref(true);
 
@@ -59,10 +65,14 @@ const predict = async () => {
       </div>
 
       <div class="d-flex align-items-center gap-2">
-        <BBadge variant="success">
+        <BBadge variant="success" v-if="loadedModel">
           <i class="bi bi-circle-fill me-1"></i>
-          Model Ready
+          {{ loadedModel?.name }}
         </BBadge>
+        <BBadge variant="secondary" v-else>
+          <i class="bi bi-circle-fill me-1"></i>
+          No model loaded
+        </BBadge>   
 
         <BButton
           variant="outline-secondary"

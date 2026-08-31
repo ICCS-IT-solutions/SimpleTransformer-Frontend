@@ -13,7 +13,6 @@ type transformerModelStoreState = {
 const defaultState : transformerModelStoreState = {
     model: null,
     models: []
-
 }
 
 const transformerModelStore = defineStore('transformerModelStore', {
@@ -43,6 +42,9 @@ const transformerModelStore = defineStore('transformerModelStore', {
         },
         async updateTransformerModel (req: CreateTransformerModelRequest) {
             await transformerModelService.createModel(req);
+        },
+        async loadModel (modelId: string) {
+            await transformerModelService.loadModel(modelId);
         }
     }
 })

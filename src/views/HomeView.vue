@@ -9,6 +9,7 @@ import {
   BButton,
   BBadge,
 } from "bootstrap-vue-next";
+
 </script>
 
 <template>
@@ -34,7 +35,8 @@ import {
           <i class="bi bi-circle-fill me-1"></i>
           Backend Online
         </BBadge>
-
+        
+        <!--Make this dynamic once the acceleration backend has been properly decoupled from the server-->
         <BBadge variant="secondary">
           CPU-SIMD
         </BBadge>

@@ -23,5 +23,10 @@ const updateModel = async (req: CreateTransformerModelRequest): Promise<ApiRespo
     return response.data;
 }
 
-export default { getModel, createModel, getModels, updateModel };
+const loadModel = async (modelId: string) : Promise<ApiResponse<TransformerModelResponse>> => {
+    var response = await axiosClient.post(`/models/${modelId}/load`);
+    return response.data;
+}
+
+export default { getModel, createModel, getModels, updateModel, loadModel };
 
