@@ -186,22 +186,56 @@ const selectedTrainingConfig = computed<TrainingConfig>(() => {
 const activeJobs = computed(() =>
   currentJobs.value.filter(job =>
     [
-      TrainingJobStatus.Pending,
       TrainingJobStatus.Running,
       TrainingJobStatus.Started,
     ].includes(job.status)
   )
 );
 
+const inactiveJobs = computed(() =>
+  currentJobs.value.filter(job =>
+    [
+      TrainingJobStatus.Paused,
+      TrainingJobStatus.Pending,
+      TrainingJobStatus.Stopped,
+    ].includes(job.status)
+  )
+);
+
+const pausedJobs = computed(() => {
+  return currentJobs.value.filter(job =>
+    [
+      TrainingJobStatus.Paused,
+    ].includes(job.status)
+  );
+});
+
+const runningJobs = computed(() => {
+  return currentJobs.value.filter(job =>
+    [
+      TrainingJobStatus.Running,
+      TrainingJobStatus.Started,
+    ].includes(job.status)
+  );
+});
+
+const queuedJobs = computed(() => {
+  return currentJobs.value.filter(job =>
+    [
+      TrainingJobStatus.Pending,
+    ].includes(job.status)
+  );
+});
+
 const getStatusText = (status: TrainingJobStatus) => {
   return TrainingJobStatus[status] ?? "Unknown";
 };
 
 const getStatusVariant = (status: TrainingJobStatus) => {
-  switch (status) {
+  switch (status) { 
     case TrainingJobStatus.Pending:
+    case TrainingJobStatus.Paused:
       return "secondary";
-
     case TrainingJobStatus.Started:
     case TrainingJobStatus.Running:
       return "primary";
@@ -361,10 +395,25 @@ const reset = () => {
           show
           class="mb-4"
         >
-          <strong>{{ activeJobs.length }}</strong>
-          training job{{ activeJobs.length === 1 ? "" : "s" }}
-          currently running.
+          <strong>{{ inactiveJobs.length + activeJobs.length  }}</strong> training job(s) total.
+          <br />
+          <strong v-if="queuedJobs.length > 0"> {{ queuedJobs.length }} queued.</strong>
+          <strong v-if="runningJobs.length > 0"> {{ runningJobs.length }} running.</strong>
+          <strong v-if="pausedJobs.length > 0"> {{ pausedJobs.length }} paused.</strong>
         </BAlert>
+                <BAlert
+          v-if="inactiveJobs.length > 0"
+          variant="secondary"
+          show
+          class="mb-4"
+        >
+          <strong>{{ inactiveJobs.length + activeJobs.length }}</strong> training job(s) total.
+          <br />
+          <strong v-if="queuedJobs.length > 0"> {{ queuedJobs.length }} queued.</strong>
+          <strong v-if="runningJobs.length > 0"> {{ runningJobs.length }} running.</strong>
+          <strong v-if="pausedJobs.length > 0"> {{ pausedJobs.length }} paused.</strong>
+        </BAlert>
+
 
         <BTabs
           content-class="mt-3"

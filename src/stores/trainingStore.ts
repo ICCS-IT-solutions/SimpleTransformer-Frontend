@@ -176,7 +176,6 @@ const trainingStore = defineStore('trainingStore', {
         async startTrainingJob(jobId: string) {
             await trainingService.startTrainingJob(jobId);
         },
-
     }
 });
 
