@@ -8,6 +8,7 @@ import {
   BFormTextarea,
   BFormSelect,
   BButton,
+  BSpinner,
 } from "bootstrap-vue-next";
 
 import type { TransformerModelEntry } from "../../services/TransformerModelEntry";
@@ -28,6 +29,9 @@ const props = defineProps<{
   transformerConfigs: TransformerConfigEntry[];
   trainingConfigs: TrainingConfigEntry[];
   backends?: AccelerationBackendInfo[];
+  // True while the submit request is in flight; disables the save button
+  // and shows a spinner so the modal feels responsive and can't double-submit.
+  busy?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -152,6 +156,7 @@ const backendOptions = computed(() => {
     <template #modal-footer="{ cancel }">
       <BButton
         variant="secondary"
+        :disabled="props.busy"
         @click="cancel()"
       >
         Cancel
@@ -161,8 +166,14 @@ const backendOptions = computed(() => {
         variant="primary"
         type="submit"
         form="model-form"
+        :disabled="props.busy"
       >
-        {{ operation === "create" ? "Create" : "Save Changes" }}
+        <BSpinner
+          v-if="props.busy"
+          small
+          class="me-1"
+        />
+        {{ props.busy ? "Saving..." : (operation === "create" ? "Create" : "Save Changes") }}
       </BButton>
     </template>
   </BModal>

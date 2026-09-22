@@ -4,6 +4,9 @@ import type { TrainingJobStatus } from "./TrainingJobStatus";
 export type TrainingProgressResponse = {
     jobId: string;
     name: string;
+    // The model this job targets, resolved server-side (name from the model table).
+    transformerModelId: string;
+    transformerModelName: string;
     status: TrainingJobStatus;
     currentEpoch: number;
     totalEpochs: number;

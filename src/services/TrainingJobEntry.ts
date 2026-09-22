@@ -5,6 +5,7 @@ export type TrainingJobEntry = {
     entryId: string;
     name: string;
     message: string;
+    transformerModelId: string;
     transformerConfigId: string;
     trainingConfigId: string;
     vocabularyId: string;

@@ -8,6 +8,7 @@ import {
   BTable,
   BAlert,
   BBadge,
+  BSpinner,
   type TableField,
 } from "bootstrap-vue-next";
 import { computed, onMounted, ref } from "vue";
@@ -55,6 +56,14 @@ const getBackends = async () => {
 
 const showModelEditor = ref(false);
 
+// True while a create/update request is in flight; drives the modal's
+// busy state (spinner + disabled buttons) so it can't be double-submitted.
+const submitting = ref(false);
+
+// Per-row action state (load/unload) so the clicked button shows a spinner
+// and row actions are locked while a request is in flight.
+const loadingModelId = ref<string | null>(null);
+
 const openModelEditor = () => {
     showModelEditor.value = true;
 }
@@ -78,40 +87,49 @@ const formModel = ref<TransformerModelEntry>(
 );
 
 const submitModel = async () => {
-    if (modelOperation.value === "create") {
-        const request : CreateTransformerModelRequest = {
-            name: formModel.value.name,
-            description: formModel.value.description,
-            transformerConfig: availableTransformerConfigs.value.find((c) => c.entryId === formModel.value.transformerConfigId)!,
-            trainingConfig: availableTrainingConfigs.value.find((c) => c.entryId === formModel.value.trainingConfigId)!,
-            accelerationBackend: formModel.value.accelerationBackend ?? "Auto"
-        };
-        const response = await store.createTransformerModel(request);
+    submitting.value = true;
+    try {
+        if (modelOperation.value === "create") {
+            const request : CreateTransformerModelRequest = {
+                name: formModel.value.name,
+                description: formModel.value.description,
+                transformerConfig: availableTransformerConfigs.value.find((c) => c.entryId === formModel.value.transformerConfigId)!,
+                trainingConfig: availableTrainingConfigs.value.find((c) => c.entryId === formModel.value.trainingConfigId)!,
+                accelerationBackend: formModel.value.accelerationBackend ?? "Auto"
+            };
+            const response = await store.createTransformerModel(request);
 
-        if (!response) {
-            notify("No response received from the backend.", "danger");
-        } else if (response.statusCode !== 200) {
-            notify(response.message || "Failed to create model.", "danger");
-        } else {
-            notify(response.message || "Model created successfully.", "success");
-        }
-    } else if (modelOperation.value === "edit") {
-        const request : CreateTransformerModelRequest = {
-            name: formModel.value.name,
-            description: formModel.value.description,
-            transformerConfig: availableTransformerConfigs.value.find((c) => c.entryId === formModel.value.transformerConfigId)!,
-            trainingConfig: availableTrainingConfigs.value.find((c) => c.entryId === formModel.value.trainingConfigId)!,
-            accelerationBackend: formModel.value.accelerationBackend ?? "Auto"
-        };
-        const response = await store.updateTransformerModel(formModel.value.entryId, request);
+            if (!response) {
+                notify("No response received from the backend.", "danger");
+            } else if (response.statusCode !== 200) {
+                //Keep the modal open so the user can correct and retry.
+                notify(response.message || "Failed to create model.", "danger");
+            } else {
+                notify(response.message || "Model created successfully.", "success");
+                showModelEditor.value = false;
+            }
+        } else if (modelOperation.value === "edit") {
+            const request : CreateTransformerModelRequest = {
+                name: formModel.value.name,
+                description: formModel.value.description,
+                transformerConfig: availableTransformerConfigs.value.find((c) => c.entryId === formModel.value.transformerConfigId)!,
+                trainingConfig: availableTrainingConfigs.value.find((c) => c.entryId === formModel.value.trainingConfigId)!,
+                accelerationBackend: formModel.value.accelerationBackend ?? "Auto"
+            };
+            const response = await store.updateTransformerModel(formModel.value.entryId, request);
 
-        if (!response) {
-            notify("No response received from the backend.", "danger");
-        } else if (response.statusCode !== 200) {
-            notify(response.message || "Failed to update model.", "danger");
-        } else {
-            notify(response.message || "Model updated successfully.", "success");
+            if (!response) {
+                notify("No response received from the backend.", "danger");
+            } else if (response.statusCode !== 200) {
+                //Keep the modal open so the user can correct and retry.
+                notify(response.message || "Failed to update model.", "danger");
+            } else {
+                notify(response.message || "Model updated successfully.", "success");
+                showModelEditor.value = false;
+            }
         }
+    } finally {
+        submitting.value = false;
     }
 }
 
@@ -142,34 +160,51 @@ const viewModel = async (_modelId: string) => {
 }
 
 const loadModel = async (modelId: string) => {
-    const response = await store.loadModel(modelId);
+    loadingModelId.value = modelId;
+    try {
+        const response = await store.loadModel(modelId);
 
-    if (!response) {
-        notify("No response received from the backend.", "danger");
-    } else if (response.statusCode !== 200) {
-        notify(response.message || "Failed to load model.", "danger");
-    } else {
-        notify(response.message || "Model loaded successfully.", "success");
+        if (!response) {
+            notify("No response received from the backend.", "danger");
+        } else if (response.statusCode !== 200) {
+            notify(response.message || "Failed to load model.", "danger");
+        } else {
+            notify(response.message || "Model loaded successfully.", "success");
+        }
+    } finally {
+        loadingModelId.value = null;
     }
 }
 
 const unloadModel = async (modelId: string) => {
-    const response = await store.unloadModel(modelId);
+    loadingModelId.value = modelId;
+    try {
+        const response = await store.unloadModel(modelId);
 
-    if (!response) {
-        notify("No response received from the backend.", "danger");
-    } else if (response.statusCode !== 200) {
-        notify(response.message || "Failed to unload model.", "danger");
-    } else {
-        notify(response.message || "Model unloaded successfully.", "success");
+        if (!response) {
+            notify("No response received from the backend.", "danger");
+        } else if (response.statusCode !== 200) {
+            notify(response.message || "Failed to unload model.", "danger");
+        } else {
+            notify(response.message || "Model unloaded successfully.", "success");
+        }
+    } finally {
+        loadingModelId.value = null;
     }
 }
 
+const refreshing = ref(false);
+
 const refresh = async () => {
-  await store.getModels();
+  refreshing.value = true;
+  try {
+    await store.getModels();
     await configStore().getTrainingConfigs();
-  await configStore().getTransformerConfigs();
-  await getBackends();
+    await configStore().getTransformerConfigs();
+    await getBackends();
+  } finally {
+    refreshing.value = false;
+  }
 }
 const modelFields: TableField[] = [
   {
@@ -254,9 +289,15 @@ const modelFields: TableField[] = [
 
           <BButton
             variant="outline-secondary"
+            :disabled="refreshing"
             @click="refresh"
           >
-            Refresh
+            <BSpinner
+              v-if="refreshing"
+              small
+              class="me-1"
+            />
+            {{ refreshing ? "Refreshing..." : "Refresh" }}
           </BButton>
         </div>
       </BCardHeader>
@@ -298,6 +339,7 @@ const modelFields: TableField[] = [
             <BButton
                 variant="outline-primary"
                 size="sm"
+                :disabled="loadingModelId !== null"
                 @click="viewModel(item.entryId)"
             >
                 <i class="bi bi-eye me-1"></i>
@@ -308,20 +350,38 @@ const modelFields: TableField[] = [
                 v-if="item.isLoaded"
                 variant="outline-danger"
                 size="sm"
+                :disabled="loadingModelId !== null"
                 @click="unloadModel(item.entryId)"
             >
-                <i class="bi bi-box-arrow-right me-1"></i>
-                Unload
+                <BSpinner
+                  v-if="loadingModelId === item.entryId"
+                  small
+                  class="me-1"
+                />
+                <i
+                  v-else
+                  class="bi bi-box-arrow-right me-1"
+                ></i>
+                {{ loadingModelId === item.entryId ? "Unloading..." : "Unload" }}
             </BButton>
 
             <BButton
                 v-else
                 variant="primary"
                 size="sm"
+                :disabled="loadingModelId !== null"
                 @click="loadModel(item.entryId)"
             >
-                <i class="bi bi-box-arrow-in-right me-1"></i>
-                Load
+                <BSpinner
+                  v-if="loadingModelId === item.entryId"
+                  small
+                  class="me-1"
+                />
+                <i
+                  v-else
+                  class="bi bi-box-arrow-in-right me-1"
+                ></i>
+                {{ loadingModelId === item.entryId ? "Loading..." : "Load" }}
             </BButton>
             </div>
         </template>
@@ -343,6 +403,7 @@ const modelFields: TableField[] = [
     :transformer-configs="availableTransformerConfigs"
     :training-configs="availableTrainingConfigs"
     :backends="accelerationBackends"
+    :busy="submitting"
     @submit="submitModel"
     />
 
