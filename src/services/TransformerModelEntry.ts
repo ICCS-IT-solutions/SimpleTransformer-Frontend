@@ -6,6 +6,7 @@ export type TransformerModelEntry = {
     isLoaded: boolean; 
     transformerConfigId: string;
     trainingConfigId: string;
+    accelerationBackend?: string;
     dateCreated: Date;
     dateUpdated?: Date;
 };

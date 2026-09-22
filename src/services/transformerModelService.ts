@@ -1,7 +1,13 @@
 import axiosClient from "../http/axiosclient";
 import type { ApiResponse } from "./ApiResponse";
+import type { AccelerationBackendInfo } from "./AccelerationBackendInfo";
 import type { CreateTransformerModelRequest } from "./CreateTransformerModelRequest";
 import type { TransformerModelResponse } from "./TransformerModelResponse";
+
+const getBackends = async (): Promise<ApiResponse<AccelerationBackendInfo[]>> => {
+    var response = await axiosClient.get('/backends');
+    return response.data;
+}
 
 const getModel = async (modelId: string): Promise<ApiResponse<TransformerModelResponse>> => {
     var response = await axiosClient.get(`/models/${modelId}`);
@@ -28,5 +34,5 @@ const loadModel = async (modelId: string) : Promise<ApiResponse<TransformerModel
     return response.data;
 }
 
-export default { getModel, createModel, getModels, updateModel, loadModel };
+export default { getModel, createModel, getModels, updateModel, loadModel, getBackends };
 

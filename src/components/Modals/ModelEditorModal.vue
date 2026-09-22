@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+import { computed } from "vue";
 import {
   BModal,
   BForm,
@@ -12,6 +13,7 @@ import {
 import type { TransformerModelEntry } from "../../services/TransformerModelEntry";
 import type { TransformerConfigEntry } from "../../services/TransformerConfigEntry";
 import type { TrainingConfigEntry } from "../../services/TrainingConfigEntry";
+import type { AccelerationBackendInfo } from "../../services/AccelerationBackendInfo";
 
 const visible = defineModel<boolean>({
   required: true,
@@ -25,6 +27,7 @@ const props = defineProps<{
   operation: "create" | "edit";
   transformerConfigs: TransformerConfigEntry[];
   trainingConfigs: TrainingConfigEntry[];
+  backends?: AccelerationBackendInfo[];
 }>();
 
 const emit = defineEmits<{
@@ -38,6 +41,34 @@ const modalTitle = () => {
 
   return `${action} Model`;
 };
+
+const backendOptions = computed(() => {
+  // Auto is inserted first by the backend endpoint, but keep it guaranteed here.
+  const options: { value: string; text: string; disabled?: boolean }[] = [
+    { value: "Auto", text: "Auto (best available)" },
+  ];
+
+  for (const backend of props.backends ?? []) {
+    if (backend.name === "Auto") {
+      continue;
+    }
+
+    options.push({
+      value: backend.name,
+      text: backend.available ? backend.name : `${backend.name} (unavailable)`,
+      disabled: !backend.available,
+    });
+  }
+
+  // Make sure the currently selected backend is always selectable (e.g. when
+  // editing a model whose backend was detected as unavailable at view time).
+  const currentBackend = model.value.accelerationBackend ?? "Auto";
+  if (!options.some((option) => option.value === currentBackend)) {
+    options.push({ value: currentBackend, text: currentBackend });
+  }
+
+  return options;
+});
 </script>
 
 <template>
@@ -101,6 +132,18 @@ const modalTitle = () => {
           v-model="model.trainingConfigId"
           :options="props.trainingConfigs.map((config) => ({ value: config.entryId, text: config.name }))"
           required
+        />
+      </BFormGroup>
+
+      <BFormGroup
+        label="Acceleration Backend"
+        label-for="model-acceleration-backend"
+        class="mb-3"
+      >
+        <BFormSelect
+          id="model-acceleration-backend"
+          v-model="model.accelerationBackend"
+          :options="backendOptions"
         />
       </BFormGroup>
 

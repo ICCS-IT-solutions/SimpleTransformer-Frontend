@@ -7,4 +7,6 @@ export type CreateTransformerModelRequest = {
     description: string;
     transformerConfig: TransformerConfigEntry;
     trainingConfig: TrainingConfigEntry;
+    // Acceleration backend name as returned by GET /backends ("Auto" selects automatically).
+    accelerationBackend: string;
 };

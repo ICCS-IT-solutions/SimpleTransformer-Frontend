@@ -13,7 +13,9 @@ import transformerModelStore from "../stores/transformerModelStore";
 import configStore from "../stores/configStore";
 import type { TransformerModelEntry } from "../services/TransformerModelEntry";
 import type { CreateTransformerModelRequest } from "../services/CreateTransformerModelRequest";
-import { useDateFormat, useNow } from "@vueuse/core";
+import type { AccelerationBackendInfo } from "../services/AccelerationBackendInfo";
+import transformerModelService from "../services/transformerModelService";
+import { useDateFormat } from "@vueuse/core";
 
 const store = transformerModelStore();
 const configs = configStore();
@@ -25,6 +27,13 @@ const availableTransformerConfigs = computed(
 const availableTrainingConfigs = computed(
   () => configs.trainingConfigResponse?.trainingConfigs ?? []
 );
+
+const accelerationBackends = ref<AccelerationBackendInfo[]>([]);
+
+const getBackends = async () => {
+  const response = await transformerModelService.getBackends();
+  accelerationBackends.value = response?.data ?? [];
+};
 
 
 
@@ -41,6 +50,7 @@ const defaultTransformerModelEntry = (): TransformerModelEntry => ({
     isLoaded: false,
     transformerConfigId: "",
     trainingConfigId: "",
+    accelerationBackend: "Auto",
     dateCreated: new Date(),
     dateUpdated: new Date(), 
 });
@@ -57,7 +67,8 @@ const submitModel = async () => {
             name: formModel.value.name,
             description: formModel.value.description,
             transformerConfig: availableTransformerConfigs.value.find((c) => c.entryId === formModel.value.transformerConfigId)!,
-            trainingConfig: availableTrainingConfigs.value.find((c) => c.entryId === formModel.value.trainingConfigId)!
+            trainingConfig: availableTrainingConfigs.value.find((c) => c.entryId === formModel.value.trainingConfigId)!,
+            accelerationBackend: formModel.value.accelerationBackend ?? "Auto"
         };
         await store.createTransformerModel(request);
     } else if (modelOperation.value === "edit") {
@@ -65,7 +76,8 @@ const submitModel = async () => {
             name: formModel.value.name,
             description: formModel.value.description,
             transformerConfig: availableTransformerConfigs.value.find((c) => c.entryId === formModel.value.transformerConfigId)!,
-            trainingConfig: availableTrainingConfigs.value.find((c) => c.entryId === formModel.value.trainingConfigId)!
+            trainingConfig: availableTrainingConfigs.value.find((c) => c.entryId === formModel.value.trainingConfigId)!,
+            accelerationBackend: formModel.value.accelerationBackend ?? "Auto"
         };
         await store.updateTransformerModel(request);
     }
@@ -79,9 +91,10 @@ onMounted(async () => {
   await store.getModels();
   await configStore().getTrainingConfigs();
   await configStore().getTransformerConfigs();
+  await getBackends();
 });
 
-const viewModel = async (modelId: string) => {
+const viewModel = async (_modelId: string) => {
     
 }
 
@@ -93,6 +106,7 @@ const refresh = async () => {
   await store.getModels();
     await configStore().getTrainingConfigs();
   await configStore().getTransformerConfigs();
+  await getBackends();
 }
 const modelFields: TableField[] = [
   {
@@ -115,6 +129,11 @@ const modelFields: TableField[] = [
   {
     key: "trainingConfigId",
     label: "Training Config",
+  },
+  {
+    key: "accelerationBackend",
+    label: "Acceleration Backend",
+    formatter: ({ value }) => (value as string) || "Auto",
   },
   {
     key: "dateCreated",
@@ -222,6 +241,7 @@ const modelFields: TableField[] = [
     :operation="modelOperation"
     :transformer-configs="availableTransformerConfigs"
     :training-configs="availableTrainingConfigs"
+    :backends="accelerationBackends"
     @submit="submitModel"
     />
 
