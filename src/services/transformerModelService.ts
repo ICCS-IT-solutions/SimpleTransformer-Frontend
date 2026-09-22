@@ -24,8 +24,8 @@ const createModel = async (req: CreateTransformerModelRequest): Promise<ApiRespo
     return response.data;
 }
 
-const updateModel = async (req: CreateTransformerModelRequest): Promise<ApiResponse<TransformerModelResponse>> => {
-    var response = await axiosClient.post('/models/update', req);
+const updateModel = async (modelId: string, req: CreateTransformerModelRequest): Promise<ApiResponse<TransformerModelResponse>> => {
+    var response = await axiosClient.post(`/models/${modelId}/update`, req);
     return response.data;
 }
 
@@ -34,5 +34,15 @@ const loadModel = async (modelId: string) : Promise<ApiResponse<TransformerModel
     return response.data;
 }
 
-export default { getModel, createModel, getModels, updateModel, loadModel, getBackends };
+const unloadModel = async (modelId: string) : Promise<ApiResponse<TransformerModelResponse>> => {
+    var response = await axiosClient.post(`/models/${modelId}/unload`);
+    return response.data;
+}
+
+const getActiveModel = async (): Promise<ApiResponse<TransformerModelResponse>> => {
+    var response = await axiosClient.get('/models/active');
+    return response.data;
+}
+
+export default { getModel, createModel, getModels, updateModel, loadModel, unloadModel, getActiveModel, getBackends };
 

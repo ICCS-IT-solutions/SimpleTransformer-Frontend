@@ -10,11 +10,15 @@ import type { TransformerModelResponse } from "../services/TransformerModelRespo
 type transformerModelStoreState = {
     model: TransformerModelEntry | null;
     models: TransformerModelEntry[];
+    // The acceleration backend actually resolved at runtime by the active model
+    // (from the load / active-model responses), e.g. "GpuVulkan (AMD Radeon RX 5700 XT)".
+    activeBackend: string | null;
 }
 
 const defaultState : transformerModelStoreState = {
     model: null,
-    models: []
+    models: [],
+    activeBackend: null
 }
 
 const transformerModelStore = defineStore('transformerModelStore', {
@@ -51,10 +55,8 @@ const transformerModelStore = defineStore('transformerModelStore', {
             }
             return response;
         },
-        async updateTransformerModel (req: CreateTransformerModelRequest): Promise<ApiResponse<TransformerModelResponse>> {
-            // NOTE: POST /models/update does not exist on the backend yet, so this
-            // currently resolves to a 404 until that endpoint is added.
-            const response = await transformerModelService.updateModel(req);
+        async updateTransformerModel (modelId: string, req: CreateTransformerModelRequest): Promise<ApiResponse<TransformerModelResponse>> {
+            const response = await transformerModelService.updateModel(modelId, req);
             if (response?.statusCode === 200) {
                 await this.getModels();
             }
@@ -66,7 +68,23 @@ const transformerModelStore = defineStore('transformerModelStore', {
             // refetch the list on success to keep this store (and e.g. the Inference
             // view's "currently loaded" badge) in sync with the backend response.
             if (response?.statusCode === 200) {
+                this.activeBackend = response.data?.activeBackend ?? null;
                 await this.getModels();
+            }
+            return response;
+        },
+        async unloadModel (modelId: string): Promise<ApiResponse<TransformerModelResponse>> {
+            const response = await transformerModelService.unloadModel(modelId);
+            if (response?.statusCode === 200) {
+                this.activeBackend = null;
+                await this.getModels();
+            }
+            return response;
+        },
+        async getActiveModel (): Promise<ApiResponse<TransformerModelResponse>> {
+            const response = await transformerModelService.getActiveModel();
+            if (response?.statusCode === 200) {
+                this.activeBackend = response.data?.activeBackend ?? null;
             }
             return response;
         }

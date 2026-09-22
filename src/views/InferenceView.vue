@@ -36,7 +36,7 @@ const loadedModelConfig = computed(
 );
 
 const backendLabel = computed(
-  () => loadedModel.value?.accelerationBackend ?? "Auto"
+  () => modelStore.activeBackend ?? loadedModel.value?.accelerationBackend ?? "Auto"
 );
 
 const vocabularyLabel = computed(() => {
@@ -66,6 +66,7 @@ onMounted(async () => {
   // "currently loaded" badge and model information card stay reactive,
   // even when landing directly on this page.
   await modelStore.getModels();
+  await modelStore.getActiveModel();
   await configStore().getTransformerConfigs();
 });
 

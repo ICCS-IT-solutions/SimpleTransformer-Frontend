@@ -103,7 +103,7 @@ const submitModel = async () => {
             trainingConfig: availableTrainingConfigs.value.find((c) => c.entryId === formModel.value.trainingConfigId)!,
             accelerationBackend: formModel.value.accelerationBackend ?? "Auto"
         };
-        const response = await store.updateTransformerModel(request);
+        const response = await store.updateTransformerModel(formModel.value.entryId, request);
 
         if (!response) {
             notify("No response received from the backend.", "danger");
@@ -150,6 +150,18 @@ const loadModel = async (modelId: string) => {
         notify(response.message || "Failed to load model.", "danger");
     } else {
         notify(response.message || "Model loaded successfully.", "success");
+    }
+}
+
+const unloadModel = async (modelId: string) => {
+    const response = await store.unloadModel(modelId);
+
+    if (!response) {
+        notify("No response received from the backend.", "danger");
+    } else if (response.statusCode !== 200) {
+        notify(response.message || "Failed to unload model.", "danger");
+    } else {
+        notify(response.message || "Model unloaded successfully.", "success");
     }
 }
 
@@ -293,13 +305,23 @@ const modelFields: TableField[] = [
             </BButton>
 
             <BButton
+                v-if="item.isLoaded"
+                variant="outline-danger"
+                size="sm"
+                @click="unloadModel(item.entryId)"
+            >
+                <i class="bi bi-box-arrow-right me-1"></i>
+                Unload
+            </BButton>
+
+            <BButton
+                v-else
                 variant="primary"
                 size="sm"
-                :disabled="item.isLoaded"
                 @click="loadModel(item.entryId)"
             >
                 <i class="bi bi-box-arrow-in-right me-1"></i>
-                {{ item.isLoaded ? "Loaded" : "Load" }}
+                Load
             </BButton>
             </div>
         </template>
