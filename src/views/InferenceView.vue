@@ -18,13 +18,41 @@ import {
 import { computed, onMounted, ref } from "vue";
 import inferenceStore from "../stores/inferenceStore";
 import transformerModelStore from "../stores/transformerModelStore";
+import configStore from "../stores/configStore";
 
 const store = inferenceStore();
 const modelStore = transformerModelStore();
+const configs = configStore();
 
 const loadedModel = computed(
   () => modelStore.models.find((m) => m.isLoaded)
 );
+
+// The config joined from the config store for the currently loaded model.
+const loadedModelConfig = computed(
+  () => (configs.transformerConfigResponse?.transformerConfigs ?? []).find(
+    (config) => config.entryId === loadedModel.value?.transformerConfigId
+  )
+);
+
+const backendLabel = computed(
+  () => loadedModel.value?.accelerationBackend ?? "Auto"
+);
+
+const vocabularyLabel = computed(() => {
+  if (!loadedModelConfig.value) {
+    return loadedModel.value ? "Unknown" : "Not loaded";
+  }
+  return `Loaded (${loadedModelConfig.value.config.vocabSize.toLocaleString()} entries)`;
+});
+
+const architectureLabel = computed(() => {
+  if (!loadedModelConfig.value) {
+    return "—";
+  }
+  const config = loadedModelConfig.value.config;
+  return `${config.numLayers} layers × ${config.numHeads} heads, d=${config.embeddingSize}`;
+});
 
 const showAdvanced = ref(true);
 
@@ -34,6 +62,11 @@ const reset = () => {
 
 onMounted(async () => {
   await store.getModels();
+  // Populate the shared transformer model + config stores so the
+  // "currently loaded" badge and model information card stay reactive,
+  // even when landing directly on this page.
+  await modelStore.getModels();
+  await configStore().getTransformerConfigs();
 });
 
 const availableModels = computed(() =>
@@ -337,19 +370,43 @@ const predict = async () => {
               <div class="col-md-4">
                 <i class="bi bi-cpu me-2"></i>
                 <strong>Model:</strong>
-                Medium
+                {{ loadedModel?.name ?? "None loaded" }}
               </div>
 
               <div class="col-md-4">
                 <i class="bi bi-lightning me-2"></i>
                 <strong>Backend:</strong>
-                CPU-SIMD
+                {{ backendLabel }}
               </div>
 
               <div class="col-md-4">
                 <i class="bi bi-book me-2"></i>
                 <strong>Vocabulary:</strong>
-                Loaded
+                {{ vocabularyLabel }}
+              </div>
+
+            </div>
+
+            <div
+              v-if="loadedModelConfig"
+              class="row text-muted small mt-2"
+            >
+              <div class="col-md-4">
+                <i class="bi bi-diagram-3 me-2"></i>
+                <strong>Architecture:</strong>
+                {{ architectureLabel }}
+              </div>
+
+              <div class="col-md-4">
+                <i class="bi bi-rulers me-2"></i>
+                <strong>Max sequence:</strong>
+                {{ loadedModelConfig.config.maxSequenceLength }}
+              </div>
+
+              <div class="col-md-4">
+                <i class="bi bi-stack me-2"></i>
+                <strong>Feed-forward:</strong>
+                {{ loadedModelConfig.config.feedForwardSize }}
               </div>
 
             </div>

@@ -120,17 +120,6 @@ const compileFields = [
   },
 ];
 
-const availableVocabulariesFields = [
-  {
-    key: "name",
-    label: "Name",
-  },
-  {
-    key: "size",
-    label: "Size",
-  }
-]
-
 const formatFileSize = (bytes: number): string => {
   if (bytes < 1024) {
     return `${bytes} B`;

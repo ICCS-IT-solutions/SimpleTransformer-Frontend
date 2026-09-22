@@ -6,6 +6,8 @@ import {
   BCardBody,
   BButton,
   BTable,
+  BAlert,
+  BBadge,
   type TableField,
 } from "bootstrap-vue-next";
 import { computed, onMounted, ref } from "vue";
@@ -26,6 +28,20 @@ const availableTransformerConfigs = computed(
 
 const availableTrainingConfigs = computed(
   () => configs.trainingConfigResponse?.trainingConfigs ?? []
+);
+
+// Map config entry ids to their names so the table can show real names
+// instead of raw GUIDs (the config lists are already fetched below).
+const transformerConfigNameById = computed(() =>
+  Object.fromEntries(
+    availableTransformerConfigs.value.map((config) => [config.entryId, config.name])
+  )
+);
+
+const trainingConfigNameById = computed(() =>
+  Object.fromEntries(
+    availableTrainingConfigs.value.map((config) => [config.entryId, config.name])
+  )
 );
 
 const accelerationBackends = ref<AccelerationBackendInfo[]>([]);
@@ -70,7 +86,15 @@ const submitModel = async () => {
             trainingConfig: availableTrainingConfigs.value.find((c) => c.entryId === formModel.value.trainingConfigId)!,
             accelerationBackend: formModel.value.accelerationBackend ?? "Auto"
         };
-        await store.createTransformerModel(request);
+        const response = await store.createTransformerModel(request);
+
+        if (!response) {
+            notify("No response received from the backend.", "danger");
+        } else if (response.statusCode !== 200) {
+            notify(response.message || "Failed to create model.", "danger");
+        } else {
+            notify(response.message || "Model created successfully.", "success");
+        }
     } else if (modelOperation.value === "edit") {
         const request : CreateTransformerModelRequest = {
             name: formModel.value.name,
@@ -79,13 +103,32 @@ const submitModel = async () => {
             trainingConfig: availableTrainingConfigs.value.find((c) => c.entryId === formModel.value.trainingConfigId)!,
             accelerationBackend: formModel.value.accelerationBackend ?? "Auto"
         };
-        await store.updateTransformerModel(request);
+        const response = await store.updateTransformerModel(request);
+
+        if (!response) {
+            notify("No response received from the backend.", "danger");
+        } else if (response.statusCode !== 200) {
+            notify(response.message || "Failed to update model.", "danger");
+        } else {
+            notify(response.message || "Model updated successfully.", "success");
+        }
     }
 }
 
 const availableModels = computed(
   () => store.models ?? []
 );
+
+// Transient status feedback surfaced from backend responses.
+const showStatus = ref(false);
+const statusMessage = ref("");
+const statusVariant = ref<"success" | "danger">("success");
+
+const notify = (message: string, variant: "success" | "danger") => {
+  statusMessage.value = message;
+  statusVariant.value = variant;
+  showStatus.value = true;
+};
 
 onMounted(async () => {
   await store.getModels();
@@ -99,7 +142,15 @@ const viewModel = async (_modelId: string) => {
 }
 
 const loadModel = async (modelId: string) => {
-    await store.loadModel(modelId);
+    const response = await store.loadModel(modelId);
+
+    if (!response) {
+        notify("No response received from the backend.", "danger");
+    } else if (response.statusCode !== 200) {
+        notify(response.message || "Failed to load model.", "danger");
+    } else {
+        notify(response.message || "Model loaded successfully.", "success");
+    }
 }
 
 const refresh = async () => {
@@ -121,14 +172,18 @@ const modelFields: TableField[] = [
     key: "isLoaded",
     label: "Loaded",
   },
-  //Use the actual config names here. I will need to either compute these or pass them out from the backend
+  //Use the actual config names here, joined client-side from the config store.
   {
     key: "transformerConfigId",
     label: "Model Config",
+    formatter: ({ value }) =>
+      transformerConfigNameById.value[value as string] ?? (value as string),
   },
   {
     key: "trainingConfigId",
     label: "Training Config",
+    formatter: ({ value }) =>
+      trainingConfigNameById.value[value as string] ?? (value as string),
   },
   {
     key: "accelerationBackend",
@@ -195,6 +250,29 @@ const modelFields: TableField[] = [
       </BCardHeader>
 
       <BCardBody>
+        <BAlert
+          v-model="showStatus"
+          :variant="statusVariant"
+          dismissible
+          class="mb-3"
+        >
+          {{ statusMessage }}
+        </BAlert>
+
+        <div class="mb-3">
+          <BBadge
+            variant="success"
+            v-if="availableModels.find((m) => m.isLoaded)"
+          >
+            <i class="bi bi-circle-fill me-1"></i>
+            Loaded: {{ availableModels.find((m) => m.isLoaded)?.name }}
+          </BBadge>
+          <BBadge variant="secondary" v-else>
+            <i class="bi bi-circle-fill me-1"></i>
+            No model loaded
+          </BBadge>
+        </div>
+
         <BTable
         :items="availableModels"
         :fields="modelFields"
@@ -217,10 +295,11 @@ const modelFields: TableField[] = [
             <BButton
                 variant="primary"
                 size="sm"
+                :disabled="item.isLoaded"
                 @click="loadModel(item.entryId)"
             >
                 <i class="bi bi-box-arrow-in-right me-1"></i>
-                Load
+                {{ item.isLoaded ? "Loaded" : "Load" }}
             </BButton>
             </div>
         </template>
