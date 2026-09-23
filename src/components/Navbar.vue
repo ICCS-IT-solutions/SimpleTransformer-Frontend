@@ -75,3 +75,31 @@ import {
     </BCollapse>
   </BNavbar>
 </template>
+
+<style scoped>
+/* Fixed high-contrast top bar. variant="dark" alone leaves the text
+   unreadable against the page in dark mode, so pin the background and
+   text explicitly - this reads well in both light and dark themes. */
+.navbar {
+  background-color: #1f2028;
+  border-bottom: 1px solid #2e303a;
+}
+
+.navbar :deep(.navbar-brand),
+.navbar :deep(.nav-link),
+.navbar :deep(.nav-item) {
+  color: #f3f4f6;
+}
+
+.navbar :deep(.nav-link:hover),
+.navbar :deep(.nav-link.active),
+.navbar :deep(.router-link-active),
+.navbar :deep(.navbar-brand:hover) {
+  color: #c084fc;
+}
+
+.navbar :deep(.navbar-toggler) {
+  border-color: #2e303a;
+  color: #f3f4f6;
+}
+</style>

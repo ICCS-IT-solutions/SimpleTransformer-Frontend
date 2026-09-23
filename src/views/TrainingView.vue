@@ -70,7 +70,7 @@ type TrainingConfigPreset = {
   config: TrainingConfig;
 };
 
-var refreshTimer: string | number | NodeJS.Timeout | null | undefined = null;
+var refreshTimer: ReturnType<typeof setInterval> | null = null;
 
 const refreshAll = async () => {
   await store.getModels();
@@ -101,13 +101,19 @@ const cancelJob = async (jobId:string) => {
 
 onMounted(async () => {
   await refreshAll();
-  setTimeout(async () => refreshTimer, 5000);
+
+  //Poll job progress so the table tracks the backend's per-step
+  //updates (loss/batch/sub-batch) without a manual refresh.
+  refreshTimer = setInterval(() => {
+    store.getTrainingJobs();
+  }, 3000);
 });
 
-onUnmounted(async () => {
-  if(refreshTimer) {
-    clearTimeout(refreshTimer);
-  };
+onUnmounted(() => {
+  if (refreshTimer) {
+    clearInterval(refreshTimer);
+    refreshTimer = null;
+  }
 });
 
 const availableModels = computed(() =>
@@ -262,6 +268,10 @@ const jobFields: TableField<TrainingProgressResponse>[] = [
     label: "Job",
   },
   {
+    key: "transformerModelName",
+    label: "Model",
+  },
+  {
     key: "status",
     label: "Status",
   },
@@ -278,9 +288,17 @@ const jobFields: TableField<TrainingProgressResponse>[] = [
     label: "Batch",
   },
   {
+    key: "currentSubBatch",
+    label: "Sub-Batch",
+  },
+  {
     key: "currentLoss",
     label: "Loss",
     formatter: ({ value }) => Number(value).toFixed(6),
+  },
+  {
+    key: "message",
+    label: "Message",
   },
   {
     key: "lastUpdatedAt",
@@ -813,6 +831,10 @@ const reset = () => {
 
                   <template #cell(currentBatch)="{ item }">
                     {{ item.currentBatch }} / {{ item.totalBatches }}
+                  </template>
+
+                  <template #cell(currentSubBatch)="{ item }">
+                    {{ item.currentSubBatch }} / {{ item.numSubBatches }}
                   </template>
                   <!--Pause, resume and cancel buttons -->
 

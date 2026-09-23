@@ -9,7 +9,29 @@ import {
   BButton,
   BBadge,
 } from "bootstrap-vue-next";
+import { onMounted, ref } from "vue";
+import type { TransformerModelResponse } from "../services/TransformerModelResponse";
+import transformerModelStore from "../stores/transformerModelStore";
 
+const modelStore = transformerModelStore();
+
+//The model currently resident in the backend (name + runtime-resolved
+//acceleration backend), so the landing page reflects live server state.
+const activeModel = ref<TransformerModelResponse | null>(null);
+
+const refreshActiveModel = async () => {
+  try {
+    const response = await modelStore.getActiveModel();
+    activeModel.value = response.data ?? null;
+  } catch {
+    activeModel.value = null;
+  }
+};
+
+onMounted(async () => {
+    await modelStore.getActiveModel();
+    await refreshActiveModel();
+});
 </script>
 
 <template>
@@ -30,15 +52,27 @@ import {
         built entirely in C#.
       </p>
 
-      <div class="d-flex justify-content-center align-items-center gap-2">
+      <div class="d-flex justify-content-center align-items-center gap-2" v-if="!modelStore.loading_activeModel">
         <BBadge variant="success">
           <i class="bi bi-circle-fill me-1"></i>
-          Backend Online
+          {{ modelStore.model?.name ?? "No model loaded" }}
         </BBadge>
         
         <!--Make this dynamic once the acceleration backend has been properly decoupled from the server-->
         <BBadge variant="secondary">
-          CPU-SIMD
+          {{ modelStore.activeBackend ?? "N/A"}}
+        </BBadge>
+      </div>
+      <div v-else-if="modelStore.loading_activeModel">
+        <BBadge variant="warning">
+          <i class="bi bi-circle-fill me-1"></i>
+          Waiting for response from backend
+        </BBadge>
+      </div>
+      <div v-else>
+        <BBadge variant="danger">
+          <i class="bi bi-circle-fill me-1"></i>
+          Backend offline
         </BBadge>
       </div>
     </section>
@@ -179,19 +213,19 @@ import {
             </BCardTitle>
 
             <div class="small text-muted mb-1">
-              Configuration
+              Loaded model
             </div>
 
             <div class="fw-semibold mb-3">
-              Medium
+              {{ activeModel?.model?.name ?? "No model loaded" }}
             </div>
 
             <div class="small text-muted mb-1">
-              Acceleration
+              Acceleration backend
             </div>
 
             <div class="fw-semibold">
-              CPU-SIMD
+              {{ activeModel?.activeBackend ?? "—" }}
             </div>
 
           </BCardBody>

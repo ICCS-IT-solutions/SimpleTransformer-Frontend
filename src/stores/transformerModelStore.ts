@@ -13,12 +13,14 @@ type transformerModelStoreState = {
     // The acceleration backend actually resolved at runtime by the active model
     // (from the load / active-model responses), e.g. "GpuVulkan (AMD Radeon RX 5700 XT)".
     activeBackend: string | null;
+    loading_activeModel: boolean;
 }
 
 const defaultState : transformerModelStoreState = {
     model: null,
     models: [],
-    activeBackend: null
+    activeBackend: null,
+    loading_activeModel: false
 }
 
 const transformerModelStore = defineStore('transformerModelStore', {
@@ -82,9 +84,12 @@ const transformerModelStore = defineStore('transformerModelStore', {
             return response;
         },
         async getActiveModel (): Promise<ApiResponse<TransformerModelResponse>> {
+            this.loading_activeModel = true;
             const response = await transformerModelService.getActiveModel();
             if (response?.statusCode === 200) {
                 this.activeBackend = response.data?.activeBackend ?? null;
+                this.model = response.data?.model ?? null;
+                this.loading_activeModel = false;
             }
             return response;
         }
