@@ -1,12 +1,11 @@
-
 export type TrainingCheckpointEntry = {
     entryId: string;
     filename: string;
     filepath: string;
     sha256?: string;
-    filesize: number;
+    fileSize: number;
     epoch: number;
     loss: number;
-    dateCreated: Date;
+    dateCreated: string;
     trainingRunId?: string;
 };

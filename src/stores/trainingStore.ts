@@ -12,6 +12,7 @@ import type { ConfigManagerTrainingConfigResponse } from '../services/ConfigMana
 import type { TransformerModelEntry } from '../services/TransformerModelEntry';
 import transformerModelService from '../services/transformerModelService';
 import type { VocabularyEntry } from '../services/VocabularyEntry';
+import type { TrainingCheckpointEntry } from '../services/TrainingCheckpointEntry';
 
 type TrainingStoreState = {
     transformerModelId: string;
@@ -23,13 +24,15 @@ type TrainingStoreState = {
     
     trainingFile: File | null;
     trainingInput: string;
-    previousCheckpoint: string;
+    /** Selected TrainingCheckpointEntry id, or '' to start from scratch. */
+    previousCheckpointId: string;
 
     trainingConfigResponse: ConfigManagerTrainingConfigResponse | null;
 
     trainingConfigOptions: TrainingConfig[] | null;
     availableModels: TransformerModelEntry[];
     availableVocabularies: VocabularyEntry[];
+    availableCheckpoints: TrainingCheckpointEntry[];
 };
 
 export const defaultAdamWTrainingConfig : TrainingConfig = {
@@ -76,7 +79,7 @@ const defaultState: TrainingStoreState = {
 
     trainingFile: null,
     trainingInput: '',
-    previousCheckpoint: '',
+    previousCheckpointId: '',
 
     trainingConfigResponse: null,
 
@@ -87,49 +90,46 @@ const defaultState: TrainingStoreState = {
 
     availableModels: [],
     availableVocabularies: [],
+    availableCheckpoints: [],
 };
 
 const trainingStore = defineStore('trainingStore', {
     state: () => defaultState,
     actions: {
-        async createJobFromFile(file: File, transformerModelId: string, vocabularyId: string, previousCheckpoint: string = "") {
+        async createJobFromFile(file: File, transformerModelId: string, vocabularyId: string, previousCheckpointId: string = "") {
             if(file === null) return;
 
             this.transformerModelId = transformerModelId;
             this.vocabularyId = vocabularyId;
 
             this.trainingFile = file;
-
-            if (previousCheckpoint) this.previousCheckpoint = previousCheckpoint;
+            this.previousCheckpointId = previousCheckpointId;
             
             const req : TrainingFileRequest = {
                 textFile: this.trainingFile, 
-                previousCheckpoint: this.previousCheckpoint,
+                previousCheckpointId: this.previousCheckpointId || null,
                 transformerModelId: this.transformerModelId,
                 vocabularyId: this.vocabularyId,
-                previousCheckpointId: ''
             };
             
             const response = await trainingService.createJobFromFile(req);
 
             this.trainingResponse = response;
         },
-        async createJob(input: string,  transformerModelId: string, vocabularyId: string,  previousCheckpoint: string = "") {
+        async createJob(input: string,  transformerModelId: string, vocabularyId: string,  previousCheckpointId: string = "") {
             if(input === '') return; //For now return on empty. Better yet would be to show a notification.
 
             this.transformerModelId = transformerModelId;
             this.vocabularyId = vocabularyId;
 
-            if (previousCheckpoint) this.previousCheckpoint = previousCheckpoint;
-            
+            this.previousCheckpointId = previousCheckpointId;
             this.trainingInput = input;
 
             const req: TrainingRequest = {
                 inputText: this.trainingInput, 
-                previousCheckpoint: this.previousCheckpoint,
+                previousCheckpointId: this.previousCheckpointId || null,
                 transformerModelId: this.transformerModelId,
                 vocabularyId: this.vocabularyId,
-                previousCheckpointId: ''
             };
 
             const response = await trainingService.createJob(req);
@@ -142,6 +142,10 @@ const trainingStore = defineStore('trainingStore', {
         async getTrainingJobs () {
             const response = await trainingService.getTrainingJobs();
             this.currentJobs = response;
+        },
+        async getCheckpoints () {
+            const response = await trainingService.getCheckpoints();
+            this.availableCheckpoints = response.data ?? [];
         },
         async getTrainingConfigs() {
             const response = await configService.GetTrainingConfigs();

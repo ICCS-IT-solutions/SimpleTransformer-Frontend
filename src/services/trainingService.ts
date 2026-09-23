@@ -1,5 +1,6 @@
 import axiosClient from "../http/axiosclient";
 import type { ApiResponse } from "./ApiResponse"
+import type { TrainingCheckpointEntry } from "./TrainingCheckpointEntry";
 import type { TrainingFileRequest } from "./TrainingFileRequest"
 import type { TrainingProgressResponse } from "./TrainingProgressResponse";
 import type { TrainingRequest } from "./TrainingRequest";
@@ -13,14 +14,9 @@ const createJobFromFile = async (req: TrainingFileRequest): Promise<ApiResponse<
     formData.append("transformerModelId", req.transformerModelId);
     formData.append("vocabularyId", req.vocabularyId);
 
-    if (req.previousCheckpoint) 
-    {
+    if (req.previousCheckpointId) {
         formData.append("previousCheckpointId", req.previousCheckpointId);
-        formData.append("previousCheckpoint", req.previousCheckpoint);
     }
-
-    console.log(formData.get("textFile"));
-    console.log(formData.get("previousCheckpoint"));
 
     var response = await axiosClient.post('/train/file', formData );
 
@@ -42,6 +38,12 @@ const getTrainingProgress = async (jobId: string): Promise<ApiResponse<TrainingP
 const getTrainingJobs = async (): Promise<ApiResponse<TrainingProgressResponse[]>> => {
 
     var response = await axiosClient.get('/train/jobs');
+    return response.data;
+}
+
+const getCheckpoints = async (): Promise<ApiResponse<TrainingCheckpointEntry[]>> => {
+
+    var response = await axiosClient.get('/train/checkpoints');
     return response.data;
 }
 const pauseTrainingJob = async (
@@ -105,6 +107,7 @@ export default {
   createJob, 
   getTrainingProgress, 
   getTrainingJobs, 
+  getCheckpoints,
   pauseTrainingJob, 
   resumeTrainingJob, 
   cancelTrainingJob, 

@@ -33,18 +33,19 @@ import trainingStore, {
   defaultSgdTrainingConfig,
 } from "../stores/trainingStore";
 
-import { computed, ref, onMounted, onUnmounted } from "vue";
+import { computed, ref, onMounted, onUnmounted, watch } from "vue";
 
 import type { TrainingConfig } from "../services/TrainingConfig";
 import { OptimizerType } from "../services/OptimizerType";
 import { TrainingJobStatus } from "../services/TrainingJobStatus";
 import type { TrainingProgressResponse } from "../services/TrainingProgressResponse";
+import type { TrainingCheckpointEntry } from "../services/TrainingCheckpointEntry";
 
 const store = trainingStore();
 
 const liveInput = ref("");
 const trainingFileInput = ref<File | null>(null);
-const previousCheckpoint = ref("");
+const previousCheckpointId = ref("");
 const selectedConfig = ref("adamw");
 const isSubmitting = ref(false);
 
@@ -77,6 +78,7 @@ const refreshAll = async () => {
   await store.getTrainingConfigs();
   await store.getVocabularies();
   await store.getTrainingJobs();
+  await store.getCheckpoints();
 }
 
 const resumeJob = async (jobId:string) => {
@@ -106,6 +108,7 @@ onMounted(async () => {
   //updates (loss/batch/sub-batch) without a manual refresh.
   refreshTimer = setInterval(() => {
     store.getTrainingJobs();
+    store.getCheckpoints();
   }, 3000);
 });
 
@@ -128,6 +131,39 @@ const availableVocabularies = computed(() =>
     value: vocabulary.entryId,
     text: vocabulary.name,
   }))
+);
+
+//Checkpoints are stored per model directory (checkpoints/<model name>/), so the
+//list box only offers files that belong to the model selected for the job.
+const checkpointOptions = computed(() => {
+  const selectedModel = (store.availableModels ?? []).find(
+    model => model.entryId === store.transformerModelId
+  );
+
+  const modelDirectory = selectedModel
+    ? `checkpoints/${selectedModel.name}/`
+    : null;
+
+  const checkpoints = (store.availableCheckpoints ?? []).filter(
+    (checkpoint: TrainingCheckpointEntry) =>
+      !modelDirectory || checkpoint.filepath === modelDirectory
+  );
+
+  return [
+    { value: "", text: "None (start from scratch)" },
+    ...checkpoints.map((checkpoint: TrainingCheckpointEntry) => ({
+      value: checkpoint.entryId,
+      text: `Epoch ${checkpoint.epoch} - loss ${checkpoint.loss.toFixed(4)} - ${checkpoint.filename}`,
+    })),
+  ];
+});
+
+//Changing the model invalidates the previously selected checkpoint.
+watch(
+  () => store.transformerModelId,
+  () => {
+    previousCheckpointId.value = "";
+  }
 );
 
 const trainingConfigOptions = computed<TrainingConfigPreset[]>(() => {
@@ -337,7 +373,7 @@ const trainFromLiveInput = async () => {
       store.transformerModelId,
       store.vocabularyId,
       //Model and vocabulary ID's need to be passed here
-      previousCheckpoint.value
+      previousCheckpointId.value
     );
 
   } finally {
@@ -358,7 +394,7 @@ const trainFromFile = async () => {
       store.transformerModelId,
       store.vocabularyId,
       //Model and vocabulary ID's need to be passed here
-      previousCheckpoint.value
+      previousCheckpointId.value
     );
 
   } finally {
@@ -369,7 +405,7 @@ const trainFromFile = async () => {
 const reset = () => {
   liveInput.value = "";
   trainingFileInput.value = null;
-  previousCheckpoint.value = "";
+  previousCheckpointId.value = "";
   selectedConfig.value = "adamw";
 
   customConfig.value = {
@@ -502,13 +538,13 @@ const reset = () => {
                           <BFormGroup
                             label="Previous checkpoint"
                             label-for="live-checkpoint"
-                            description="Optional. Leave empty to start from scratch."
+                            description="Optional. Resume from a saved checkpoint."
                             class="mb-3"
                           >
-                            <BFormInput
+                            <BFormSelect
                               id="live-checkpoint"
-                              v-model="previousCheckpoint"
-                              placeholder="Checkpoint ID"
+                              v-model="previousCheckpointId"
+                              :options="checkpointOptions"
                             />
                           </BFormGroup>
                         </BCol>
@@ -681,13 +717,13 @@ const reset = () => {
                       <BFormGroup
                         label="Previous checkpoint"
                         label-for="file-checkpoint"
-                        description="Optional. Specify a checkpoint to resume training."
+                        description="Optional. Resume from a saved checkpoint."
                         class="mb-4"
                       >
-                        <BFormInput
+                        <BFormSelect
                           id="file-checkpoint"
-                          v-model="previousCheckpoint"
-                          placeholder="Checkpoint ID"
+                          v-model="previousCheckpointId"
+                          :options="checkpointOptions"
                         />
                       </BFormGroup>
 

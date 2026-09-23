@@ -1,17 +1,22 @@
 ```vue
 <script setup lang="ts">
+import { BApp } from "bootstrap-vue-next";
 import { RouterView } from "vue-router";
 import Navbar from "./components/Navbar.vue";
+import ToastHost from "./components/ToastHost.vue";
 </script>
 
 <template>
-  <div class="app-shell">
-    <Navbar />
+  <BApp>
+    <ToastHost />
+    <div class="app-shell">
+      <Navbar />
 
-    <main class="app-content">
-      <RouterView />
-    </main>
-  </div>
+      <main class="app-content">
+        <RouterView />
+      </main>
+    </div>
+  </BApp>
 </template>
 
 <style>
