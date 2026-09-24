@@ -180,6 +180,14 @@ const trainingStore = defineStore('trainingStore', {
         async startTrainingJob(jobId: string) {
             await trainingService.startTrainingJob(jobId);
         },
+        async deleteTrainingJob(jobId: string) {
+            await trainingService.deleteTrainingJob(jobId);
+            await this.getTrainingJobs();
+        },
+        async resetTrainingJob(jobId: string) {
+            await trainingService.resetTrainingJob(jobId);
+            await this.getTrainingJobs();
+        },
     }
 });
 

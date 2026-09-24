@@ -25,6 +25,7 @@ import {
   BAlert,
   BListGroup,
   BListGroupItem,
+  BSpinner,
   type TableField,
 } from "bootstrap-vue-next";
 
@@ -77,28 +78,60 @@ const refreshAll = async () => {
   await store.getModels();
   await store.getTrainingConfigs();
   await store.getVocabularies();
-  await store.getTrainingJobs();
+  await refreshJobs();
   await store.getCheckpoints();
 }
 
+//Jobs carry the state the Start/Resume buttons depend on, so refetch them right
+//after the backend confirms a status change instead of waiting for the poll.
+const refreshJobs = async () => {
+  await store.getTrainingJobs();
+}
+
+//Starting or resuming a job loads the model (and a checkpoint) on the backend,
+//which can take tens of seconds. Track the in-flight job so its row shows a
+//spinner and no second action can be submitted while it prepares.
+const jobActionId = ref<string | null>(null);
+
+const runJobAction = async (jobId: string, action: () => Promise<unknown>) => {
+  if (jobActionId.value !== null) return;
+
+  jobActionId.value = jobId;
+
+  try {
+    await action();
+    await refreshJobs();
+  } finally {
+    jobActionId.value = null;
+  }
+}
+
 const resumeJob = async (jobId:string) => {
-  await store.resumeTrainingJob(jobId);
+  await runJobAction(jobId, () => store.resumeTrainingJob(jobId));
 }
 
 const pauseJob = async (jobId:string) => {
-  await store.pauseTrainingJob(jobId);
+  await runJobAction(jobId, () => store.pauseTrainingJob(jobId));
 }
 
 const stopJob = async (jobId:string) => {
-  await store.stopTrainingJob(jobId);
+  await runJobAction(jobId, () => store.stopTrainingJob(jobId));
 }
 
 const startJob = async (jobId:string) => {
-  await store.startTrainingJob(jobId);
+  await runJobAction(jobId, () => store.startTrainingJob(jobId));
 }
 
 const cancelJob = async (jobId:string) => {
-  await store.cancelTrainingJob(jobId);
+  await runJobAction(jobId, () => store.cancelTrainingJob(jobId));
+}
+
+const deleteJob = async (jobId:string) => {
+  await runJobAction(jobId, () => store.deleteTrainingJob(jobId));
+}
+
+const resetJob = async (jobId:string) => {
+  await runJobAction(jobId, () => store.resetTrainingJob(jobId));
 }
 
 onMounted(async () => {
@@ -276,11 +309,20 @@ const getStatusText = (status: TrainingJobStatus) => {
 const getStatusVariant = (status: TrainingJobStatus) => {
   switch (status) { 
     case TrainingJobStatus.Pending:
-    case TrainingJobStatus.Paused:
       return "secondary";
+    case TrainingJobStatus.Paused:
+      return "warning";
     case TrainingJobStatus.Started:
     case TrainingJobStatus.Running:
       return "primary";
+    case TrainingJobStatus.Stopped:
+      return "dark";
+    case TrainingJobStatus.Completed:
+      return "success";
+    case TrainingJobStatus.Failed:
+      return "danger";
+    case TrainingJobStatus.Cancelled:
+      return "dark";
 
     default:
       return "secondary";
@@ -875,10 +917,24 @@ const reset = () => {
                   <!--Pause, resume and cancel buttons -->
 
                   <template #cell(actions)="{ item }">
-                    <div class="d-flex justify-content-end gap-2">
+                    <fieldset
+                      :disabled="jobActionId !== null"
+                      class="border-0 p-0 m-0"
+                    >
+                    <div class="d-flex justify-content-end align-items-center gap-2">
+                    <BSpinner
+                      v-if="jobActionId === item.jobId"
+                      small
+                      variant="primary"
+                      label="Working..."
+                    />
                     <BButton 
                       variant="outline-primary"
                       size="sm"
+                      v-if="item.status === TrainingJobStatus.Paused ||
+                        item.status === TrainingJobStatus.Stopped ||
+                        item.status === TrainingJobStatus.Failed ||
+                        item.status === TrainingJobStatus.Pending"
                       @click="startJob(item.jobId)"
                       >
                         <i class="bi bi-play-circle me-1"></i>
@@ -887,6 +943,8 @@ const reset = () => {
                     <BButton
                       variant="outline-primary"
                       size="sm"
+                      v-if="item.status === TrainingJobStatus.Running ||
+                        item.status === TrainingJobStatus.Started"
                       @click="pauseJob(item.jobId)"
                     >
                       <i class="bi bi-pause-circle me-1"></i>
@@ -895,24 +953,57 @@ const reset = () => {
                       <BButton
                         variant="outline-primary"
                         size="sm"
+                        v-if="item.status === TrainingJobStatus.Paused ||
+                          item.status === TrainingJobStatus.Stopped ||
+                          item.status === TrainingJobStatus.Failed"
                         @click="resumeJob(item.jobId)"
                       >
                         <i class="bi bi-play-circle me-1"></i>
                         Resume
                       </BButton>
-                      <BButton variant ="outline-danger" size="sm" @click="stopJob(item.jobId)">
+                      <BButton
+                        variant ="outline-danger"
+                        size="sm"
+                        v-if="item.status === TrainingJobStatus.Running ||
+                          item.status === TrainingJobStatus.Started ||
+                          item.status === TrainingJobStatus.Paused"
+                        @click="stopJob(item.jobId)"
+                      >
                         <i class="bi bi-stop-circle me-1"></i>
                         Stop
                       </BButton>
                       <BButton
                         variant="outline-danger"
                         size="sm"
+                        v-if="item.status !== TrainingJobStatus.Completed &&
+                          item.status !== TrainingJobStatus.Cancelled"
                         @click="cancelJob(item.jobId)"
                       >
                         <i class="bi bi-x-circle me-1"></i>
                         Cancel
                       </BButton>
+                      <BButton
+                        variant="outline-secondary"
+                        size="sm"
+                        @click="resetJob(item.jobId)"
+                      >
+                        <i class="bi bi-arrow-counterclockwise me-1"></i>
+                        Reset
+                      </BButton>
+                      <BButton
+                        variant="outline-danger"
+                        size="sm"
+                        v-if="item.status === TrainingJobStatus.Completed ||
+                          item.status === TrainingJobStatus.Cancelled ||
+                          item.status === TrainingJobStatus.Failed ||
+                          item.status === TrainingJobStatus.Pending"
+                        @click="deleteJob(item.jobId)"
+                      >
+                        <i class="bi bi-trash me-1"></i>
+                        Delete
+                      </BButton>
                     </div>
+                    </fieldset>
                   </template>
 
 
