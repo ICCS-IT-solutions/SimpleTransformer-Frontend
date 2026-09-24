@@ -1,5 +1,6 @@
 export type TrainingCheckpointEntry = {
     entryId: string;
+    transformerModelId: string;
     filename: string;
     filepath: string;
     sha256?: string;

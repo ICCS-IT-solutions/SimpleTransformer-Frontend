@@ -15,9 +15,10 @@ import {
   BFormSelect,
   BCollapse,
 } from "bootstrap-vue-next";
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import inferenceStore from "../stores/inferenceStore";
 import transformerModelStore from "../stores/transformerModelStore";
+import type { TrainingCheckpointEntry } from "../services/TrainingCheckpointEntry";
 import configStore from "../stores/configStore";
 
 const store = inferenceStore();
@@ -68,6 +69,13 @@ onMounted(async () => {
   await modelStore.getModels();
   await modelStore.getActiveModel();
   await configStore().getTransformerConfigs();
+
+  if (loadedModel.value && !store.request.transformerModelId) {
+    store.request.transformerModelId = loadedModel.value.entryId;
+  }
+  if (store.request.transformerModelId) {
+    await store.getCheckpoints(store.request.transformerModelId);
+  }
 });
 
 const availableModels = computed(() =>
@@ -76,6 +84,26 @@ const availableModels = computed(() =>
     text: model.name,
   }))
 );
+
+watch(
+  () => store.request.transformerModelId,
+  async (newModelId) => {
+    store.request.trainingCheckpointId = null;
+    if (newModelId) {
+      await store.getCheckpoints(newModelId);
+    } else {
+      store.availableCheckpoints = [];
+    }
+  }
+);
+
+const checkpointOptions = computed(() => [
+  { value: null, text: "None (use current model weights)" },
+  ...(store.availableCheckpoints ?? []).map((checkpoint: TrainingCheckpointEntry) => ({
+    value: checkpoint.entryId,
+    text: `Epoch ${checkpoint.epoch} - loss ${checkpoint.loss.toFixed(4)} - ${checkpoint.filename}`,
+  })),
+]);
 
 const predict = async () => {
   await store.predict(store.request);
@@ -171,6 +199,19 @@ const predict = async () => {
                 />
               </BFormGroup>
 
+              <!--Checkpoint selector -->
+              <BFormGroup
+                label="Checkpoint"
+                label-for="checkpoint-selector"
+                description="Optional. Load weights from a specific training checkpoint."
+                class="mb-3"
+              >
+                <BFormSelect
+                  id="checkpoint-selector"
+                  v-model="store.request.trainingCheckpointId"
+                  :options="checkpointOptions"
+                />
+              </BFormGroup>
 
               <!-- Parameters -->
               <div class="border rounded p-3 mb-3">

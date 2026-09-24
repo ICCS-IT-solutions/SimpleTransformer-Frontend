@@ -607,7 +607,7 @@ const reset = () => {
                           variant="primary"
                           :disabled="!liveInput.trim() || isSubmitting"
                         >
-                          {{ isSubmitting ? "Starting..." : "Start Training" }}
+                          {{ isSubmitting ? "Enqueuing job..." : "Enqueue job" }}
                         </BButton>
                       </div>
 
@@ -784,7 +784,7 @@ const reset = () => {
                           variant="primary"
                           :disabled="!trainingFileInput || isSubmitting"
                         >
-                          {{ isSubmitting ? "Starting..." : "Start Training" }}
+                          {{ isSubmitting ? "Enqueuing job..." : "Enqueue job" }}
                         </BButton>
                       </div>
 
