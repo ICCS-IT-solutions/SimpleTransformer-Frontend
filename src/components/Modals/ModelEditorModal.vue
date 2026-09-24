@@ -7,6 +7,7 @@ import {
   BFormInput,
   BFormTextarea,
   BFormSelect,
+  BFormCheckbox,
   BButton,
   BSpinner,
 } from "bootstrap-vue-next";
@@ -73,6 +74,16 @@ const backendOptions = computed(() => {
 
   return options;
 });
+
+//Training mode is structural: a QLoRA model and a raw model expose different
+//trainable parameters, so a checkpoint from one can never load into the other.
+//It is therefore chosen once at creation and shown read-only when editing.
+const useQLora = computed({
+  get: () => model.value.useQLora !== false,
+  set: (value: boolean) => {
+    model.value.useQLora = value;
+  },
+});
 </script>
 
 <template>
@@ -137,6 +148,39 @@ const backendOptions = computed(() => {
           :options="props.trainingConfigs.map((config) => ({ value: config.entryId, text: config.name }))"
           required
         />
+      </BFormGroup>
+
+      <BFormGroup
+        label="Training Mode"
+        label-for="model-use-qlora"
+        class="mb-3"
+      >
+        <BFormCheckbox
+          id="model-use-qlora"
+          v-model="useQLora"
+          :disabled="props.operation === 'edit'"
+        >
+          Quantised LoRA (QLoRA)
+        </BFormCheckbox>
+
+        <div class="form-text">
+          <template v-if="useQLora">
+            Frozen 4-bit base weights with small trainable LoRA adapters. Low memory
+            use; recommended for this machine.
+          </template>
+          <template v-else>
+            Raw (full fine-tuning). Every weight is a dense fp32 trainable parameter,
+            so optimizer state is several times larger - pair with a small config.
+          </template>
+        </div>
+
+        <div
+          v-if="props.operation === 'edit'"
+          class="form-text text-warning"
+        >
+          Training mode cannot be changed after creation. Create a new model to
+          train the other way.
+        </div>
       </BFormGroup>
 
       <BFormGroup

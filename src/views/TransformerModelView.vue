@@ -76,6 +76,7 @@ const defaultTransformerModelEntry = (): TransformerModelEntry => ({
     transformerConfigId: "",
     trainingConfigId: "",
     accelerationBackend: "Auto",
+    useQLora: true,
     dateCreated: new Date(),
     dateUpdated: new Date(), 
 });
@@ -95,7 +96,8 @@ const submitModel = async () => {
                 description: formModel.value.description,
                 transformerConfig: availableTransformerConfigs.value.find((c) => c.entryId === formModel.value.transformerConfigId)!,
                 trainingConfig: availableTrainingConfigs.value.find((c) => c.entryId === formModel.value.trainingConfigId)!,
-                accelerationBackend: formModel.value.accelerationBackend ?? "Auto"
+                accelerationBackend: formModel.value.accelerationBackend ?? "Auto",
+                useQLora: formModel.value.useQLora !== false
             };
             const response = await store.createTransformerModel(request);
 
@@ -114,7 +116,10 @@ const submitModel = async () => {
                 description: formModel.value.description,
                 transformerConfig: availableTransformerConfigs.value.find((c) => c.entryId === formModel.value.transformerConfigId)!,
                 trainingConfig: availableTrainingConfigs.value.find((c) => c.entryId === formModel.value.trainingConfigId)!,
-                accelerationBackend: formModel.value.accelerationBackend ?? "Auto"
+                accelerationBackend: formModel.value.accelerationBackend ?? "Auto",
+                //Sent for shape consistency only: the backend deliberately keeps
+                //the stored value, so an existing model can never be flipped.
+                useQLora: formModel.value.useQLora !== false
             };
             const response = await store.updateTransformerModel(formModel.value.entryId, request);
 
@@ -231,6 +236,11 @@ const modelFields: TableField[] = [
     label: "Training Config",
     formatter: ({ value }) =>
       trainingConfigNameById.value[value as string] ?? (value as string),
+  },
+  {
+    key: "useQLora",
+    label: "Training Mode",
+    formatter: ({ value }) => (value === false ? "Raw" : "QLoRA"),
   },
   {
     key: "accelerationBackend",

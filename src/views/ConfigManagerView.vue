@@ -40,6 +40,7 @@ const defaultTrainingConfig = (): TrainingConfig => ({
   optimizer: OptimizerType.AdamW,
   learningRate: 0.001,
   batchSize: 8,
+  dropLast: true,
   epochs: 10,
   dropoutRate: 0.1,
   weightDecay: 0.01,

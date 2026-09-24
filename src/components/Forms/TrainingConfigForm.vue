@@ -86,6 +86,24 @@ const optimizerOptions = [
 
       <BCol md="6">
         <BFormGroup
+          label="Drop Last Partial Batch"
+          label-for="drop-last"
+          description="Skip a trailing mini-batch smaller than Batch Size, so every optimizer step uses a full batch."
+          class="mb-3"
+        >
+          <BFormCheckbox
+            id="drop-last"
+            v-model="model.dropLast"
+          >
+            {{ model.dropLast === false ? "Disabled (keep remainder)" : "Enabled" }}
+          </BFormCheckbox>
+        </BFormGroup>
+      </BCol>
+    </BRow>
+
+    <BRow>
+      <BCol md="6">
+        <BFormGroup
           label="Epochs"
           label-for="epochs"
           class="mb-3"

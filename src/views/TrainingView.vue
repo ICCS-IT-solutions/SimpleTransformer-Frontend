@@ -12,6 +12,7 @@ import {
   BForm,
   BFormGroup,
   BFormInput,
+  BFormCheckbox,
   BFormTextarea,
   BFormSelect,
   BFormFile,
@@ -1084,6 +1085,21 @@ const reset = () => {
                     type="number"
                     min="1"
                   />
+                </BFormGroup>
+
+                <BFormGroup
+                  label="Drop Last Partial Batch"
+                  class="mb-3"
+                >
+                  <BFormCheckbox
+                    v-model="customConfig.dropLast"
+                  >
+                    {{ customConfig.dropLast === false ? "Disabled (keep remainder)" : "Enabled" }}
+                  </BFormCheckbox>
+                  <div class="form-text">
+                    Skips a trailing mini-batch smaller than Batch Size so every
+                    optimizer step uses a full batch.
+                  </div>
                 </BFormGroup>
 
                 <BFormGroup
