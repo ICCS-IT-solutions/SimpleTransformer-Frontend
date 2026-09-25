@@ -22,7 +22,7 @@ type TrainingStoreState = {
     currentJobs: ApiResponse<TrainingProgressResponse[]> | null;
     currentJob: ApiResponse<TrainingProgressResponse> | null;
     
-    trainingFile: File | null;
+    trainingFiles: File[];
     trainingInput: string;
     /** Selected TrainingCheckpointEntry id, or '' to start from scratch. */
     previousCheckpointId: string;
@@ -79,7 +79,7 @@ const defaultState: TrainingStoreState = {
     currentJobs: null,
     currentJob: null,
 
-    trainingFile: null,
+    trainingFiles: [],
     trainingInput: '',
     previousCheckpointId: '',
 
@@ -98,17 +98,17 @@ const defaultState: TrainingStoreState = {
 const trainingStore = defineStore('trainingStore', {
     state: () => defaultState,
     actions: {
-        async createJobFromFile(file: File, transformerModelId: string, vocabularyId: string, previousCheckpointId: string = "") {
-            if(file === null) return;
+        async createJobFromFile(files: File[], transformerModelId: string, vocabularyId: string, previousCheckpointId: string = "") {
+            if (!files || files.length === 0) return;
 
             this.transformerModelId = transformerModelId;
             this.vocabularyId = vocabularyId;
 
-            this.trainingFile = file;
+            this.trainingFiles = files;
             this.previousCheckpointId = previousCheckpointId;
             
             const req : TrainingFileRequest = {
-                textFile: this.trainingFile, 
+                textFiles: this.trainingFiles, 
                 previousCheckpointId: this.previousCheckpointId || null,
                 transformerModelId: this.transformerModelId,
                 vocabularyId: this.vocabularyId,

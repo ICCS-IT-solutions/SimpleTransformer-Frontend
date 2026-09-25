@@ -10,7 +10,9 @@ const createJobFromFile = async (req: TrainingFileRequest): Promise<ApiResponse<
 
     const formData = new FormData();
 
-    formData.append('textFile', req.textFile);
+    req.textFiles.forEach((file) => {
+        formData.append('textFiles', file);
+    });
     formData.append("transformerModelId", req.transformerModelId);
     formData.append("vocabularyId", req.vocabularyId);
 

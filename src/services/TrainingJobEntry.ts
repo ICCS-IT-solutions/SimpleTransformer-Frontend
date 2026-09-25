@@ -11,6 +11,8 @@ export type TrainingJobEntry = {
     vocabularyId: string;
     inputText?: string;
     inputFilePath: string;
+    /** Original filenames uploaded for this job, comma separated. */
+    sourceFileNames: string;
     previousCheckpointId?: string;
     dateCreated: Date;
     dateUpdated: Date;

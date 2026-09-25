@@ -46,7 +46,14 @@ import type { TrainingCheckpointEntry } from "../services/TrainingCheckpointEntr
 const store = trainingStore();
 
 const liveInput = ref("");
-const trainingFileInput = ref<File | null>(null);
+const trainingFileInput = ref<File | readonly File[] | null>(null);
+const selectedTrainingFiles = computed<File[]>(() => {
+  //Cast away the readonly array from BFormFile's emit type so the union
+  //narrows cleanly to a mutable File[] for submission.
+  const value = trainingFileInput.value as File | File[] | null;
+  if (value === null) return [];
+  return Array.isArray(value) ? value : [value];
+});
 const previousCheckpointId = ref("");
 const selectedConfig = ref("adamw");
 const isSubmitting = ref(false);
@@ -351,6 +358,11 @@ const jobFields: TableField<TrainingProgressResponse>[] = [
     label: "Model",
   },
   {
+    key: "sourceFileNames",
+    label: "Source",
+    formatter: ({ value }) => (value ? String(value) : "—"),
+  },
+  {
     key: "status",
     label: "Status",
   },
@@ -425,7 +437,9 @@ const trainFromLiveInput = async () => {
 };
 
 const trainFromFile = async () => {
-  if (!trainingFileInput.value) {
+  const files = selectedTrainingFiles.value;
+
+  if (files.length === 0) {
     return;
   }
 
@@ -433,7 +447,7 @@ const trainFromFile = async () => {
 
   try {
     await store.createJobFromFile(
-      trainingFileInput.value,
+      files,
       store.transformerModelId,
       store.vocabularyId,
       //Model and vocabulary ID's need to be passed here
@@ -720,17 +734,27 @@ const reset = () => {
                     <BForm @submit.prevent="trainFromFile">
 
                       <BFormGroup
-                        label="Training file"
+                        label="Training files"
                         label-for="training-file"
-                        description="Select a plain text training corpus."
+                        description="Select one or more plain text training corpus files. They are combined into a single corpus for this job."
                         class="mb-4"
                       >
                         <BFormFile
                           id="training-file"
                           v-model="trainingFileInput"
+                          multiple
                           accept=".txt"
                           browse-text="Browse"
                         />
+
+                        <small
+                          v-if="selectedTrainingFiles.length > 0"
+                          class="text-muted d-block mt-1"
+                        >
+                          {{ selectedTrainingFiles.length }}
+                          {{ selectedTrainingFiles.length === 1 ? "file" : "files" }}:
+                          {{ selectedTrainingFiles.map((file) => file.name).join(", ") }}
+                        </small>
                       </BFormGroup>
                       <!-- Model selector -->
                       <BFormGroup
@@ -782,7 +806,7 @@ const reset = () => {
                         <BButton
                           type="submit"
                           variant="primary"
-                          :disabled="!trainingFileInput || isSubmitting"
+                          :disabled="selectedTrainingFiles.length === 0 || isSubmitting"
                         >
                           {{ isSubmitting ? "Enqueuing job..." : "Enqueue job" }}
                         </BButton>

@@ -5,6 +5,7 @@ import {
   BCard,
   BCardHeader,
   BCardBody,
+  BCardFooter,
   BRow,
   BCol,
   BButton,
@@ -244,6 +245,25 @@ const transformerConfigFields: TableField[] = [
   },
 ];
 
+const legendFields: TableField[] = [
+  {
+    key: "abbreviation",
+    label: "Abbreviation",
+  },
+  {
+    key: "fullName",
+    label: "Full name",
+  },
+];
+
+const legendItems = [
+  { abbreviation: "E", fullName: "Embedding size" },
+  { abbreviation: "L", fullName: "Layers" },
+  { abbreviation: "H", fullName: "Attention heads" },
+  { abbreviation: "F", fullName: "Feed-forward size" },
+  { abbreviation: "S", fullName: "Sequence length" },
+];
+
 onMounted(async () => {
   await getConfigs();
 });
@@ -378,6 +398,23 @@ onMounted(async () => {
           </BTab>
         </BTabs>
       </BCardBody>
+      <BCardFooter>
+        <!--Legend-->
+        <h6 class="mb-2">
+          <i class="bi bi-info-circle me-1"></i>
+          Technical name abbreviations
+        </h6>
+
+        <BTable
+          :items="legendItems"
+          :fields="legendFields"
+          responsive
+          striped
+          hover
+          bordered
+          class="mb-0"
+        />
+      </BCardFooter>
     </BCard>
   </BContainer>
   <ConfigEditorModal 

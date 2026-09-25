@@ -7,6 +7,8 @@ export type TrainingProgressResponse = {
     // The model this job targets, resolved server-side (name from the model table).
     transformerModelId: string;
     transformerModelName: string;
+    /** Original filenames uploaded for file based jobs, comma separated. Empty for live jobs. */
+    sourceFileNames: string;
     status: TrainingJobStatus;
     currentEpoch: number;
     totalEpochs: number;
