@@ -72,6 +72,7 @@ const showCreateConfigModal = ref(false);
 const createConfigType= ref<ConfigType>("training");
 
 const formName = ref("");
+const formDisplayName = ref("");
 const formDescription = ref("");
 
 const getConfigs = async () => {
@@ -95,6 +96,7 @@ const openCreateModal = (type: ConfigType) => {
   editingConfigId.value = null;
 
   formName.value = "";
+  formDisplayName.value = "";
   formDescription.value = "";
 
   if (type === "training") {
@@ -151,6 +153,7 @@ const editTransformerConfig = async (configId: string) => {
   editingConfigId.value = config.entryId;
 
   formName.value = config.name;
+  formDisplayName.value = config.displayName ?? "";
   formDescription.value = config.description;
 
   formTransformerConfig.value = {
@@ -183,6 +186,7 @@ const submitConfig = async () => {
   } else {
     const request = {
       name: formName.value.trim(),
+      displayName: formDisplayName.value.trim() || undefined,
       description: formDescription.value.trim(),
       config: { ...formTransformerConfig.value } // Fixed: formTransformerConfig instead of transformerConfig
     };
@@ -221,8 +225,12 @@ const trainingConfigFields: TableField[] = [
 
 const transformerConfigFields: TableField[] = [
   {
+    key: "displayName",
+    label: "Display Name",
+  },
+  {
     key: "name",
-    label: "Name",
+    label: "Technical Name",
   },
   {
     key: "description",
@@ -375,6 +383,7 @@ onMounted(async () => {
   <ConfigEditorModal 
     v-model="showCreateConfigModal"
     v-model:name="formName"
+    v-model:display-name="formDisplayName"
     v-model:description="formDescription"
     v-model:training-config="formTrainingConfig"
     v-model:transformer-config="formTransformerConfig"

@@ -35,7 +35,10 @@ const availableTrainingConfigs = computed(
 // instead of raw GUIDs (the config lists are already fetched below).
 const transformerConfigNameById = computed(() =>
   Object.fromEntries(
-    availableTransformerConfigs.value.map((config) => [config.entryId, config.name])
+    availableTransformerConfigs.value.map((config) => [
+      config.entryId,
+      config.displayName ? `${config.displayName} (${config.name})` : config.name,
+    ])
   )
 );
 

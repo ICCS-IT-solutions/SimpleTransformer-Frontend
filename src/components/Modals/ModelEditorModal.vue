@@ -132,7 +132,10 @@ const useQLora = computed({
         <BFormSelect
           id="model-config"
           v-model="model.transformerConfigId"
-          :options="props.transformerConfigs.map((config) => ({ value: config.entryId, text: config.name }))"
+          :options="props.transformerConfigs.map((config) => ({
+            value: config.entryId,
+            text: config.displayName ? `${config.displayName} (${config.name})` : config.name
+          }))"
           required
         />
       </BFormGroup>

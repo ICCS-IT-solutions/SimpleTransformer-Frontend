@@ -30,6 +30,8 @@ const name = defineModel<string>("name", {
   required: true,
 });
 
+const displayName = defineModel<string>("displayName");
+
 const description = defineModel<string>("description", {
   required: true,
 });
@@ -79,8 +81,22 @@ const modalTitle = () => {
         <BFormInput
           id="config-name"
           v-model="name"
-          placeholder="Enter configuration name"
+          placeholder="Enter configuration name (e.g. E512-L6-H8-F1024-S512)"
           required
+        />
+      </BFormGroup>
+
+      <BFormGroup
+        v-if="configType === 'transformer'"
+        label="Display Name"
+        label-for="config-display-name"
+        description="Friendly name shown in model selection dropdowns (e.g. Micro (512-ctx))."
+        class="mb-3"
+      >
+        <BFormInput
+          id="config-display-name"
+          v-model="displayName"
+          placeholder="Enter friendly display name"
         />
       </BFormGroup>
 
