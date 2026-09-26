@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import type { TrainingConfig } from '../services/TrainingConfig';
-import type { TrainingFileRequest } from '../services/TrainingFileRequest';
+import type { TrainingFileRequest, CorpusPreviewRequest, CorpusPreprocessOptions, CorpusPreprocessReport, TrainingCorpusEntry } from '../services/TrainingFileRequest';
 import type { TrainingRequest } from '../services/TrainingRequest';
 import trainingService from '../services/trainingService';
 import configService from '../services/ConfigService';
@@ -26,6 +26,16 @@ type TrainingStoreState = {
     trainingInput: string;
     /** Selected TrainingCheckpointEntry id, or '' to start from scratch. */
     previousCheckpointId: string;
+
+    /** Extract + preprocess controls for file uploads; defaults preserve legacy .txt behaviour. */
+    preprocessOptions: CorpusPreprocessOptions;
+    corpusPreview: ApiResponse<CorpusPreprocessReport> | null;
+    isPreviewingCorpus: boolean;
+
+    /** Named, reusable corpora prepared ahead of training. */
+    availableCorpora: TrainingCorpusEntry[];
+    /** Saved corpus selected for the next file-training job, or '' to upload files. */
+    selectedCorpusId: string;
 
     trainingConfigResponse: ConfigManagerTrainingConfigResponse | null;
 
@@ -83,6 +93,22 @@ const defaultState: TrainingStoreState = {
     trainingInput: '',
     previousCheckpointId: '',
 
+    preprocessOptions: {
+        format: 'auto',
+        textField: '',
+        template: '',
+        normalizeWhitespace: true,
+        stripHtml: false,
+        deduplicate: true,
+        minChars: 0,
+        maxChars: 0,
+    },
+    corpusPreview: null,
+    isPreviewingCorpus: false,
+
+    availableCorpora: [],
+    selectedCorpusId: '',
+
     trainingConfigResponse: null,
 
     trainingConfigOptions: [
@@ -99,7 +125,8 @@ const trainingStore = defineStore('trainingStore', {
     state: () => defaultState,
     actions: {
         async createJobFromFile(files: File[], transformerModelId: string, vocabularyId: string, previousCheckpointId: string = "") {
-            if (!files || files.length === 0) return;
+            const useCorpus = this.selectedCorpusId !== '';
+            if (!useCorpus && (!files || files.length === 0)) return;
 
             this.transformerModelId = transformerModelId;
             this.vocabularyId = vocabularyId;
@@ -109,14 +136,33 @@ const trainingStore = defineStore('trainingStore', {
             
             const req : TrainingFileRequest = {
                 textFiles: this.trainingFiles, 
+                trainingCorpusId: this.selectedCorpusId || null,
                 previousCheckpointId: this.previousCheckpointId || null,
                 transformerModelId: this.transformerModelId,
                 vocabularyId: this.vocabularyId,
+                ...this.preprocessOptions,
             };
             
             const response = await trainingService.createJobFromFile(req);
 
             this.trainingResponse = response;
+        },
+        async previewCorpus(files: File[]) {
+            if (!files || files.length === 0) return;
+
+            this.isPreviewingCorpus = true;
+            this.corpusPreview = null;
+
+            try {
+                const req: CorpusPreviewRequest = {
+                    textFiles: files,
+                    ...this.preprocessOptions,
+                };
+
+                this.corpusPreview = await trainingService.previewCorpus(req);
+            } finally {
+                this.isPreviewingCorpus = false;
+            }
         },
         async createJob(input: string,  transformerModelId: string, vocabularyId: string,  previousCheckpointId: string = "") {
             if(input === '') return; //For now return on empty. Better yet would be to show a notification.
@@ -148,6 +194,17 @@ const trainingStore = defineStore('trainingStore', {
         async getCheckpoints () {
             const response = await trainingService.getCheckpoints();
             this.availableCheckpoints = response.data ?? [];
+        },
+        async getAvailableCorpora() {
+            const response = await trainingService.getAvailableCorpora();
+            this.availableCorpora = response.data ?? [];
+        },
+        async deleteCorpus(corpusId: string) {
+            await trainingService.deleteCorpus(corpusId);
+            if (this.selectedCorpusId === corpusId) {
+                this.selectedCorpusId = '';
+            }
+            await this.getAvailableCorpora();
         },
         async getTrainingConfigs() {
             const response = await configService.GetTrainingConfigs();

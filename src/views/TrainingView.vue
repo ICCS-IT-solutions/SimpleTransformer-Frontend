@@ -38,6 +38,7 @@ import trainingStore, {
 import { computed, ref, onMounted, onUnmounted, watch } from "vue";
 
 import type { TrainingConfig } from "../services/TrainingConfig";
+import type { CorpusSourceFormat } from "../services/TrainingFileRequest";
 import { OptimizerType } from "../services/OptimizerType";
 import { TrainingJobStatus } from "../services/TrainingJobStatus";
 import type { TrainingProgressResponse } from "../services/TrainingProgressResponse";
@@ -88,6 +89,7 @@ const refreshAll = async () => {
   await store.getVocabularies();
   await refreshJobs();
   await store.getCheckpoints();
+  await store.getAvailableCorpora();
 }
 
 //Jobs carry the state the Start/Resume buttons depend on, so refetch them right
@@ -439,7 +441,7 @@ const trainFromLiveInput = async () => {
 const trainFromFile = async () => {
   const files = selectedTrainingFiles.value;
 
-  if (files.length === 0) {
+  if (!usingSavedCorpus.value && files.length === 0) {
     return;
   }
 
@@ -458,6 +460,46 @@ const trainFromFile = async () => {
     isSubmitting.value = false;
   }
 };
+
+const previewCorpus = async () => {
+  const files = selectedTrainingFiles.value;
+
+  if (files.length === 0) {
+    return;
+  }
+
+  await store.previewCorpus(files);
+};
+
+const corpusFormatOptions: { text: string; value: CorpusSourceFormat }[] = [
+  { text: "Auto (from extension)", value: "auto" },
+  { text: "Plain text", value: "txt" },
+  { text: "JSON", value: "json" },
+  { text: "JSON Lines", value: "jsonl" },
+];
+
+const corpusPreview = computed(() => store.corpusPreview?.data ?? null);
+const corpusPreviewMessage = computed(() => store.corpusPreview?.message ?? "");
+const corpusUsable = computed(() => (corpusPreview.value?.documentsOut ?? 0) > 0);
+
+const previewSampleFields = [
+  { key: "fileName", label: "File" },
+  { key: "cleaned", label: "Cleaned sample" },
+];
+
+const usingSavedCorpus = computed(() => store.selectedCorpusId !== "");
+
+const selectedCorpus = computed(() =>
+  store.availableCorpora.find((c) => c.entryId === store.selectedCorpusId) ?? null
+);
+
+const corpusSourceOptions = computed(() => [
+  { text: "Upload new files", value: "" },
+  ...store.availableCorpora.map((c) => ({
+    text: `${c.name} — ${c.documentsOut}/${c.documentsIn} docs, ${c.usedByJobs} ${c.usedByJobs === 1 ? "job" : "jobs"}`,
+    value: c.entryId,
+  })),
+]);
 
 const reset = () => {
   liveInput.value = "";
@@ -734,16 +776,40 @@ const reset = () => {
                     <BForm @submit.prevent="trainFromFile">
 
                       <BFormGroup
+                        label="Corpus source"
+                        label-for="training-corpus"
+                        description="Use a prepared corpus, or upload new files. Saved corpora are managed under Training Data."
+                        class="mb-4"
+                      >
+                        <BFormSelect
+                          id="training-corpus"
+                          v-model="store.selectedCorpusId"
+                          :options="corpusSourceOptions"
+                        />
+
+                        <small
+                          v-if="selectedCorpus"
+                          class="text-muted d-block mt-1"
+                        >
+                          {{ selectedCorpus.documentsOut }} of {{ selectedCorpus.documentsIn }} documents,
+                          {{ selectedCorpus.charsOut }} chars from {{ selectedCorpus.sourceFileNames }}.
+                          Used by {{ selectedCorpus.usedByJobs }}
+                          {{ selectedCorpus.usedByJobs === 1 ? "job" : "jobs" }}.
+                        </small>
+                      </BFormGroup>
+
+                      <div v-if="!usingSavedCorpus">
+                      <BFormGroup
                         label="Training files"
                         label-for="training-file"
-                        description="Select one or more plain text training corpus files. They are combined into a single corpus for this job."
+                        description="Select one or more training corpus files (.txt, .json, .jsonl). Files are extracted to plain text, cleaned, and combined into a single corpus for this job."
                         class="mb-4"
                       >
                         <BFormFile
                           id="training-file"
                           v-model="trainingFileInput"
                           multiple
-                          accept=".txt"
+                          accept=".txt,.json,.jsonl,.ndjson"
                           browse-text="Browse"
                         />
 
@@ -756,6 +822,160 @@ const reset = () => {
                           {{ selectedTrainingFiles.map((file) => file.name).join(", ") }}
                         </small>
                       </BFormGroup>
+                      <BCard class="mb-4">
+                        <BCardHeader>
+                          <BCardTitle class="mb-0">
+                            Corpus preprocessing
+                          </BCardTitle>
+                        </BCardHeader>
+                        <BCardBody>
+                          <BRow>
+                            <BCol md="6">
+                              <BFormGroup
+                                label="Format"
+                                label-for="corpus-format"
+                                class="mb-3"
+                              >
+                                <BFormSelect
+                                  id="corpus-format"
+                                  v-model="store.preprocessOptions.format"
+                                  :options="corpusFormatOptions"
+                                />
+                              </BFormGroup>
+                              <BFormGroup
+                                label="Text field"
+                                label-for="corpus-text-field"
+                                description="JSON object field holding the training text."
+                                class="mb-3"
+                              >
+                                <BFormInput
+                                  id="corpus-text-field"
+                                  v-model="store.preprocessOptions.textField"
+                                  placeholder="text"
+                                />
+                              </BFormGroup>
+                              <BFormGroup
+                                label="Template"
+                                label-for="corpus-template"
+                                description="Optional template for multi-field records."
+                                class="mb-3"
+                              >
+                                <BFormInput
+                                  id="corpus-template"
+                                  v-model="store.preprocessOptions.template"
+                                  placeholder="{prompt} {completion}"
+                                />
+                              </BFormGroup>
+                            </BCol>
+                            <BCol md="6">
+                              <BFormGroup
+                                label="Minimum chars"
+                                label-for="corpus-min-chars"
+                                class="mb-3"
+                              >
+                                <BFormInput
+                                  id="corpus-min-chars"
+                                  v-model.number="store.preprocessOptions.minChars"
+                                  type="number"
+                                  min="0"
+                                />
+                              </BFormGroup>
+                              <BFormGroup
+                                label="Maximum chars (0 = unlimited)"
+                                label-for="corpus-max-chars"
+                                class="mb-3"
+                              >
+                                <BFormInput
+                                  id="corpus-max-chars"
+                                  v-model.number="store.preprocessOptions.maxChars"
+                                  type="number"
+                                  min="0"
+                                />
+                              </BFormGroup>
+                              <BFormCheckbox
+                                v-model="store.preprocessOptions.normalizeWhitespace"
+                                class="mb-2"
+                              >
+                                Normalize whitespace
+                              </BFormCheckbox>
+                              <BFormCheckbox
+                                v-model="store.preprocessOptions.deduplicate"
+                                class="mb-2"
+                              >
+                                Remove exact duplicates
+                              </BFormCheckbox>
+                              <BFormCheckbox
+                                v-model="store.preprocessOptions.stripHtml"
+                                class="mb-2"
+                              >
+                                Strip HTML
+                              </BFormCheckbox>
+                            </BCol>
+                          </BRow>
+                          <div class="d-flex justify-content-start gap-2 mt-2">
+                            <BButton
+                              type="button"
+                              variant="outline-primary"
+                              :disabled="selectedTrainingFiles.length === 0 || store.isPreviewingCorpus"
+                              @click="previewCorpus"
+                            >
+                              {{ store.isPreviewingCorpus ? "Previewing..." : "Preview" }}
+                            </BButton>
+                          </div>
+                          <div
+                            v-if="corpusPreview"
+                            class="mt-3"
+                          >
+                            <BAlert
+                              :variant="corpusUsable ? 'success' : 'warning'"
+                              show
+                            >
+                              {{ corpusPreviewMessage }}
+                            </BAlert>
+                            <BRow class="g-2 mb-3">
+                              <BCol cols="6" md="3">
+                                <small class="text-muted d-block">Documents</small>
+                                <strong>{{ corpusPreview.documentsOut }} / {{ corpusPreview.documentsIn }}</strong>
+                              </BCol>
+                              <BCol cols="6" md="3">
+                                <small class="text-muted d-block">Chars</small>
+                                <strong>{{ corpusPreview.charsOut }} / {{ corpusPreview.charsIn }}</strong>
+                              </BCol>
+                              <BCol cols="6" md="3">
+                                <small class="text-muted d-block">Duplicates removed</small>
+                                <strong>{{ corpusPreview.duplicatesRemoved }}</strong>
+                              </BCol>
+                              <BCol cols="6" md="3">
+                                <small class="text-muted d-block">Filtered</small>
+                                <strong>{{ corpusPreview.filteredByLength + corpusPreview.filteredEmpty }}</strong>
+                              </BCol>
+                            </BRow>
+                            <BAlert
+                              v-if="corpusPreview.warnings.length > 0"
+                              variant="warning"
+                              show
+                            >
+                              <ul class="mb-0">
+                                <li
+                                  v-for="(warning, index) in corpusPreview.warnings.slice(0, 10)"
+                                  :key="index"
+                                >
+                                  {{ warning }}
+                                </li>
+                              </ul>
+                            </BAlert>
+                            <BTable
+                              v-if="corpusPreview.samples.length > 0"
+                              :items="corpusPreview.samples"
+                              :fields="previewSampleFields"
+                              small
+                              striped
+                            />
+                          </div>
+                        </BCardBody>
+                      </BCard>
+                      </div><!-- /upload new files -->
+
                       <!-- Model selector -->
                       <BFormGroup
                         label="Model"

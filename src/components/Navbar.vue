@@ -45,6 +45,11 @@ import {
           Training
         </BNavItem>
 
+        <BNavItem :to="{ name: 'corpora' }">
+          <i class="bi bi-database me-1"></i>
+          Training Data
+        </BNavItem>
+
         <BNavItem :to="{ name: 'vocab' }">
           <i class="bi bi-book me-1"></i>
           Vocabulary

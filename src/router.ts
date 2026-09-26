@@ -31,6 +31,11 @@ const router = createRouter({
             component: () => import('./views/ConfigManagerView.vue')
         },
         {
+            path: '/corpora',
+            name: 'corpora',
+            component: () => import('./views/TrainingCorporaView.vue')
+        },
+        {
             path: '/models',
             name: 'models',
             component: () => import('./views/TransformerModelView.vue')
