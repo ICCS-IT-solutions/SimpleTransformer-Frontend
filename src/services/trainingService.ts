@@ -10,11 +10,13 @@ const appendPreprocessOptions = (formData: FormData, req: CorpusPreviewRequest |
     if (req.format) formData.append("format", req.format);
     if (req.textField) formData.append("textField", req.textField);
     if (req.template) formData.append("template", req.template);
-    formData.append("normalizeWhitespace", String(req.normalizeWhitespace ?? true));
-    formData.append("stripHtml", String(req.stripHtml ?? false));
-    formData.append("deduplicate", String(req.deduplicate ?? true));
-    formData.append("minChars", String(req.minChars ?? 0));
-    formData.append("maxChars", String(req.maxChars ?? 0));
+    if (req.normalizeWhitespace !== undefined) formData.append("normalizeWhitespace", String(req.normalizeWhitespace));
+    if (req.stripHtml !== undefined) formData.append("stripHtml", String(req.stripHtml));
+    if (req.deduplicate !== undefined) formData.append("deduplicate", String(req.deduplicate));
+    // Skip blank numerics: an empty form value binds as "" which fails int
+    // model binding server-side. Omitting the key keeps the backend default.
+    if (req.minChars !== undefined && req.minChars !== null && String(req.minChars) !== "") formData.append("minChars", String(req.minChars));
+    if (req.maxChars !== undefined && req.maxChars !== null && String(req.maxChars) !== "") formData.append("maxChars", String(req.maxChars));
 };
 
 const createJobFromFile = async (req: TrainingFileRequest): Promise<ApiResponse<TrainingResponse>> => {
