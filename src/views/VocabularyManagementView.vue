@@ -10,6 +10,8 @@ import {
   BForm,
   BFormGroup,
   BFormFile,
+  BFormInput,
+  BFormSelect,
   BButton,
   BTable,
   BFormCheckbox,
@@ -23,6 +25,15 @@ import vocabStore from "../stores/vocabStore";
 import { computed, onMounted, ref } from "vue";
 import type { VocabularySourceFile } from "../services/VocabularySourceFile";
 import type { VocabularyEntry } from "../services/VocabularyEntry";
+import {
+  DEFAULT_VOCAB_SIZE,
+  MAX_VOCAB_SIZE,
+  MIN_VOCAB_SIZE,
+} from "../services/CompileVocabularyRequest";
+import type {
+  CompileVocabularyRequest,
+  VocabularyTokenizerType,
+} from "../services/CompileVocabularyRequest";
 
 const store = vocabStore();
 
@@ -37,22 +48,135 @@ const isCompiling = ref(false);
 const uploadMessage = ref("");
 const compileMessage = ref("");
 
+// Compile settings sent with every request.
+const compileVocabSize = ref<number>(DEFAULT_VOCAB_SIZE);
+const compileTokenizerType = ref<VocabularyTokenizerType>("WordLevel");
+const compileName = ref("");
+
+const tokenizerOptions: { text: string; value: VocabularyTokenizerType }[] = [
+  { text: "Word level (most frequent types)", value: "WordLevel" },
+  { text: "BPE (byte pair merges)", value: "Bpe" },
+  { text: "SentencePiece (subword units)", value: "SentencePiece" },
+];
+
 const vocabProperties = computed(
   () => store.vocabularyPropertiesResponse?.data
 );
 
+/**
+ * Details of the loaded model's vocabulary: the live token map, the pinned
+ * database row (provenance included) and every mismatch the backend found.
+ */
+const activeVocabulary = computed(
+  () => store.activeVocabularyResponse?.data
+);
+
+const vocabularyIssues = computed(
+  () => activeVocabulary.value?.issues ?? []
+);
+
+const vocabularyConsistent = computed(() => {
+  const data = activeVocabulary.value;
+  if (!data) return null;
+  return (data.issues ?? []).length === 0;
+});
+
+const pinnedVocabulary = computed(
+  () => activeVocabulary.value?.vocabulary ?? null
+);
+
+/** Badge for "does the pinned artifact equal the vocabulary being used?". */
+const liveMatchBadge = computed<{
+  variant: "success" | "danger" | "secondary";
+  label: string;
+}>(() => {
+  const data = activeVocabulary.value;
+
+  if (!data?.vocabulary) {
+    return { variant: "secondary", label: "Not pinned" };
+  }
+
+  return data.liveVocabularyMatchesModel
+    ? { variant: "success", label: "Matches live" }
+    : { variant: "danger", label: "Differs from live" };
+});
+
+/**
+ * Provenance rows for the database entry the model is pinned to: where it came
+ * from, what was requested and what was actually produced. Empty when the
+ * model has no pinned vocabulary yet.
+ */
+const pinnedVocabularyRows = computed(() => {
+  const entry = pinnedVocabulary.value;
+
+  if (!entry) {
+    return [];
+  }
+
+  const rows: { property: string; value: string | number }[] = [
+    { property: "Tokenizer", value: entry.tokenizerType },
+    { property: "Tokens", value: entry.numTokens },
+    {
+      property: "Requested size",
+      value: entry.requestedSize > 0 ? entry.requestedSize : "Not recorded",
+    },
+    {
+      property: "Types observed",
+      value: entry.typesSeen > 0 ? entry.typesSeen : "Not measured",
+    },
+    {
+      property: "Coverage",
+      value:
+        entry.typesSeen > 0
+          ? `${Math.round(entry.coverage * 1000) / 10}%`
+          : "Not measured",
+    },
+    {
+      property: "Source files",
+      value: entry.sourceFileNames || "Not recorded",
+    },
+    {
+      property: "Created",
+      value: new Date(entry.dateCreated).toLocaleString(),
+    },
+    {
+      property: "Artifact",
+      value: activeVocabulary.value?.vocabularyPath || entry.filepath,
+    },
+  ];
+
+  const artifactTokens = activeVocabulary.value?.vocabularyFileTokenCount;
+  if (artifactTokens != null) {
+    rows.push({ property: "Artifact tokens", value: artifactTokens });
+  }
+
+  return rows;
+});
+
+// Prefer the rich active-vocabulary payload (tokenizer, model, mismatches);
+// fall back to the plain properties endpoint when only that has been loaded.
 const vocabPropertyRows = computed(() => {
-  const props = vocabProperties.value;
+  const props = activeVocabulary.value ?? vocabProperties.value;
 
   if (!props) {
     return [];
   }
 
-  return [
+  const rows: { property: string; value: string | number }[] = [
     {
       property: "Vocabulary Size",
       value: props.vocabSize,
     },
+  ];
+
+  if (props.tokenizerType) {
+    rows.push({
+      property: "Tokenizer",
+      value: props.tokenizerType,
+    });
+  }
+
+  rows.push(
     {
       property: "Unknown Token",
       value: props.unknownToken,
@@ -72,8 +196,10 @@ const vocabPropertyRows = computed(() => {
     {
       property: "Mask Token",
       value: props.maskToken,
-    },
-  ];
+    }
+  );
+
+  return rows;
 });
 
 const vocabPropertyFields = [
@@ -119,6 +245,58 @@ const compileFields = [
     label: "Size",
   },
 ];
+
+const compileResultFields = [
+  {
+    key: "property",
+    label: "Property",
+  },
+  {
+    key: "value",
+    label: "Value",
+  },
+];
+
+const compileResult = computed(
+  () => store.vocabularyCompileResponse?.data ?? null
+);
+
+const compileError = computed(() => store.vocabularyCompileError);
+
+const compileSizeValid = computed(
+  () =>
+    Number.isFinite(compileVocabSize.value) &&
+    compileVocabSize.value >= MIN_VOCAB_SIZE &&
+    compileVocabSize.value <= MAX_VOCAB_SIZE
+);
+
+const compileResultRows = computed(() => {
+  const result = compileResult.value;
+
+  if (!result) {
+    return [];
+  }
+
+  //Only the word-level compiler collects coverage statistics, so the other
+  //algorithms report them as unmeasured instead of a misleading 100%.
+  const statsMeasured = result.typesSeen > 0;
+
+  return [
+    { property: "Tokenizer", value: result.tokenizerType },
+    { property: "Requested size", value: result.requestedVocabSize },
+    { property: "Actual size", value: result.actualVocabSize },
+    {
+      property: "Distinct types seen",
+      value: statsMeasured ? result.typesSeen : "Not measured",
+    },
+    {
+      property: "Coverage",
+      value: statsMeasured
+        ? `${(result.coverage * 100).toFixed(1)}%`
+        : "Not measured",
+    },
+  ];
+});
 
 const formatFileSize = (bytes: number): string => {
   if (bytes < 1024) {
@@ -199,8 +377,12 @@ const uploadFiles = async () => {
 
   try {
     await store.UploadVocabFile(selectedFiles.value);
-    uploadMessage.value = "Files uploaded successfully.";
+    uploadMessage.value =
+      store.vocabularyLoadResponse?.message || "Files uploaded successfully.";
     selectedFiles.value = [];
+
+    //Newly uploaded sources must appear in the compile list right away.
+    await getVocabSources();
   } finally {
     isUploading.value = false;
   }
@@ -253,20 +435,42 @@ const clearCompileSelection = () => {
 };
 
 const compileFiles = async () => {
-  if (selectedFilesToCompile.value.length === 0) {
+  if (selectedFilesToCompile.value.length === 0 || !compileSizeValid.value) {
     return;
   }
 
   isCompiling.value = true;
   compileMessage.value = "";
 
-  try {
-    await store.CompileVocabFiles(
-      selectedFilesToCompile.value.map(file => file.name)
-    );
+  const name = compileName.value.trim();
 
-    compileMessage.value = "Vocabulary compiled successfully.";
+  const request: CompileVocabularyRequest = {
+    files: selectedFilesToCompile.value.map(file => file.name),
+    vocabSize: compileVocabSize.value,
+    tokenizerType: compileTokenizerType.value,
+  };
+
+  if (name.length > 0) {
+    request.name = name;
+  }
+
+  try {
+    await store.CompileVocabFiles(request);
+
+    //Failures are recorded by the store so the inline alert can show them.
+    if (store.vocabularyCompileError) {
+      return;
+    }
+
+    compileMessage.value =
+      store.vocabularyCompileResponse?.message ||
+      "Vocabulary compiled successfully.";
+
     selectedFilesToCompile.value = [];
+    compileName.value = "";
+
+    //The new entry has to show up in the available vocabularies list.
+    await getAvailableVocabularies();
   } finally {
     isCompiling.value = false;
   }
@@ -274,6 +478,20 @@ const compileFiles = async () => {
 
 const getVocabProps = async () => {
   await store.GetVocabProperties();
+};
+
+/**
+ * Loads the full vocabulary picture for the details tab: the live vocabulary,
+ * the row the loaded model is pinned to, and the backend's mismatch list.
+ */
+const getActiveVocabulary = async () => {
+  await store.GetActiveVocabulary();
+};
+
+/** Refresh used by the details tab: both the plain and the model-aware view. */
+const refreshVocabularyDetails = async () => {
+  await getVocabProps();
+  await getActiveVocabulary();
 };
 
 const getVocabSources = async () => {
@@ -287,6 +505,7 @@ const getVocabSources = async () => {
 onMounted(async () => {
   await getVocabSources();
   await getVocabProps();
+  await getActiveVocabulary();
 });
 </script>
 
@@ -351,14 +570,14 @@ onMounted(async () => {
                     <BFormFile
                       id="vocab-file"
                       v-model="vocabFilesInput"
-                      accept=".txt"
+                      accept=".txt,.log,.json,.jsonl,.ndjson"
                       browse-text="Browse"
                       multiple
                       @update:model-value="addFiles"
                     />
 
                     <small class="text-muted">
-                      Supported format: .txt
+                      Supported formats: .txt, .log, .json, .jsonl, .ndjson
                     </small>
                   </BFormGroup>
 
@@ -464,7 +683,9 @@ onMounted(async () => {
                 <ol class="mb-0 ps-3">
 
                   <li class="mb-3">
-                    Select one or more <strong>.txt</strong> files.
+                    Select one or more <strong>.txt</strong>,
+                    <strong>.log</strong>, <strong>.json</strong> or
+                    <strong>.jsonl</strong> files.
                   </li>
 
                   <li class="mb-3">
@@ -521,6 +742,83 @@ onMounted(async () => {
           </BCardHeader>
 
           <BCardBody>
+
+            <!-- Compilation settings -->
+            <BRow class="g-3 mb-3">
+
+              <BCol lg="4">
+                <BFormGroup
+                  label="Vocabulary size"
+                  label-for="vocab-size"
+                  :description="
+                    `Including special tokens (${MIN_VOCAB_SIZE}-${MAX_VOCAB_SIZE}).`
+                  "
+                  class="mb-0"
+                >
+                  <BFormInput
+                    id="vocab-size"
+                    v-model.number="compileVocabSize"
+                    type="number"
+                    :min="MIN_VOCAB_SIZE"
+                    :max="MAX_VOCAB_SIZE"
+                    step="500"
+                  />
+                </BFormGroup>
+              </BCol>
+
+              <BCol lg="4">
+                <BFormGroup
+                  label="Tokenizer"
+                  label-for="vocab-tokenizer"
+                  description="Algorithm used to build the vocabulary."
+                  class="mb-0"
+                >
+                  <BFormSelect
+                    id="vocab-tokenizer"
+                    v-model="compileTokenizerType"
+                    :options="tokenizerOptions"
+                  />
+                </BFormGroup>
+              </BCol>
+
+              <BCol lg="4">
+                <BFormGroup
+                  label="Name (optional)"
+                  label-for="vocab-name"
+                  description="Omit to generate a unique name."
+                  class="mb-0"
+                >
+                  <BFormInput
+                    id="vocab-name"
+                    v-model="compileName"
+                    placeholder="e.g. koran-20k-wordlevel"
+                  />
+                </BFormGroup>
+              </BCol>
+
+            </BRow>
+
+            <BAlert
+              v-if="!compileSizeValid"
+              variant="warning"
+              show
+              class="mb-3"
+            >
+              <i class="bi bi-exclamation-triangle me-2"></i>
+
+              Vocabulary size must be between
+              {{ MIN_VOCAB_SIZE }} and {{ MAX_VOCAB_SIZE }} tokens.
+            </BAlert>
+
+            <BAlert
+              v-if="compileError"
+              variant="danger"
+              show
+              class="mb-3"
+            >
+              <i class="bi bi-x-circle me-2"></i>
+              {{ compileError }}
+            </BAlert>
 
             <BAlert
               v-if="compileMessage"
@@ -612,6 +910,54 @@ onMounted(async () => {
 
               </BTable>
 
+              <!-- Result of the last compilation -->
+              <BCard
+                v-if="compileResult"
+                class="border-success mt-3"
+              >
+                <BCardHeader class="d-flex justify-content-between align-items-center">
+                  <h6 class="mb-0">
+                    <i class="bi bi-clipboard-check me-2"></i>
+                    Last compilation
+                  </h6>
+
+                  <BBadge variant="success">
+                    {{ compileResult.actualVocabSize }} tokens
+                  </BBadge>
+                </BCardHeader>
+
+                <BCardBody>
+
+                  <BTable
+                    :items="compileResultRows"
+                    :fields="compileResultFields"
+                    responsive
+                    striped
+                  />
+
+                  <div
+                    v-if="compileResult.sampleTokens.length > 0"
+                    class="mt-3"
+                  >
+                    <div class="text-muted small mb-2">
+                      Sample tokens (specials first, then most frequent)
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-1">
+                      <BBadge
+                        v-for="token in compileResult.sampleTokens"
+                        :key="token"
+                        variant="secondary"
+                        class="font-monospace"
+                      >
+                        {{ token }}
+                      </BBadge>
+                    </div>
+                  </div>
+
+                </BCardBody>
+              </BCard>
+
               <div class="d-flex justify-content-between align-items-center mt-3">
 
                 <span class="text-muted">
@@ -626,7 +972,9 @@ onMounted(async () => {
                 <BButton
                   variant="primary"
                   :disabled="
-                    selectedCompileCount === 0 || isCompiling
+                    selectedCompileCount === 0 ||
+                    isCompiling ||
+                    !compileSizeValid
                   "
                   @click="compileFiles"
                 >
@@ -656,6 +1004,60 @@ onMounted(async () => {
 
         <BRow class="g-4">
 
+          <!-- Consistency report: everything the backend found wrong between
+               the model config, the pinned artifact and the live vocabulary. -->
+          <BCol cols="12">
+            <BAlert
+              v-if="activeVocabulary && vocabularyConsistent"
+              variant="success"
+              show
+            >
+              <div class="d-flex align-items-center">
+                <i class="bi bi-check-circle me-2"></i>
+                <div>
+                  <strong>Vocabulary consistent.</strong>
+                  The loaded vocabulary matches
+                  {{ activeVocabulary.modelName ?? "the active model" }}
+                  and its configuration.
+                </div>
+              </div>
+            </BAlert>
+
+            <BAlert
+              v-else-if="vocabularyIssues.length > 0"
+              variant="danger"
+              show
+            >
+              <div class="d-flex align-items-start">
+                <i class="bi bi-exclamation-triangle me-2 mt-1"></i>
+                <div>
+                  <strong>
+                    {{ vocabularyIssues.length }}
+                    vocabulary problem{{ vocabularyIssues.length === 1 ? "" : "s" }}
+                    found.
+                  </strong>
+                  <ul class="mb-0 mt-1">
+                    <li
+                      v-for="(issue, index) in vocabularyIssues"
+                      :key="index"
+                    >
+                      {{ issue }}
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </BAlert>
+
+            <BAlert
+              v-else
+              variant="secondary"
+              show
+            >
+              No vocabulary details loaded yet. Press Refresh to inspect the
+              loaded vocabulary against the model that uses it.
+            </BAlert>
+          </BCol>
+
           <BCol lg="8">
             <BCard>
 
@@ -676,7 +1078,7 @@ onMounted(async () => {
                   <BButton
                     variant="outline-secondary"
                     size="sm"
-                    @click="getVocabProps"
+                    @click="refreshVocabularyDetails"
                   >
                     <i class="bi bi-arrow-clockwise me-1"></i>
                     Refresh
@@ -709,7 +1111,7 @@ onMounted(async () => {
                   <BButton
                     class="mt-3"
                     variant="primary"
-                    @click="getVocabProps"
+                    @click="refreshVocabularyDetails"
                   >
                     Load Vocabulary Information
                   </BButton>
@@ -737,23 +1139,116 @@ onMounted(async () => {
                   <span>Status</span>
 
                   <BBadge
-                    :variant="vocabProperties ? 'success' : 'secondary'"
+                    :variant="vocabProperties || activeVocabulary ? 'success' : 'secondary'"
                   >
-                    {{ vocabProperties ? "Loaded" : "Unavailable" }}
+                    {{ vocabProperties || activeVocabulary ? "Loaded" : "Unavailable" }}
                   </BBadge>
                 </div>
 
                 <div
-                  v-if="vocabProperties"
-                  class="d-flex justify-content-between"
+                  class="d-flex justify-content-between border-bottom pb-2 mb-2"
+                >
+                  <span>Pinned vocabulary</span>
+
+                  <BBadge :variant="liveMatchBadge.variant">
+                    {{ liveMatchBadge.label }}
+                  </BBadge>
+                </div>
+
+                <div
+                  v-if="vocabProperties || activeVocabulary"
+                  class="d-flex justify-content-between border-bottom pb-2 mb-2"
                 >
                   <span>Tokens</span>
 
                   <strong>
-                    {{ vocabProperties.vocabSize }}
+                    {{ (activeVocabulary ?? vocabProperties)?.vocabSize }}
                   </strong>
                 </div>
 
+                <div
+                  v-if="activeVocabulary?.modelName"
+                  class="d-flex justify-content-between border-bottom pb-2 mb-2"
+                >
+                  <span>Model</span>
+
+                  <strong>
+                    {{ activeVocabulary.modelName }}
+                  </strong>
+                </div>
+
+                <div
+                  v-if="activeVocabulary?.modelVocabSize != null"
+                  class="d-flex justify-content-between border-bottom pb-2 mb-2"
+                >
+                  <span>Config vocab size</span>
+
+                  <strong>
+                    {{ activeVocabulary.modelVocabSize }}
+                  </strong>
+                </div>
+
+                <div
+                  v-if="pinnedVocabulary"
+                  class="d-flex justify-content-between"
+                >
+                  <span>Artifact on disk</span>
+
+                  <BBadge
+                    :variant="activeVocabulary?.vocabularyFileExists ? 'success' : 'danger'"
+                  >
+                    {{ activeVocabulary?.vocabularyFileExists ? "Readable" : "Missing" }}
+                  </BBadge>
+                </div>
+
+              </BCardBody>
+            </BCard>
+          </BCol>
+
+          <!-- Provenance of the vocabulary row the model is pinned to. -->
+          <BCol
+            v-if="pinnedVocabulary"
+            cols="12"
+          >
+            <BCard>
+              <BCardHeader>
+                <div class="d-flex justify-content-between align-items-center">
+                  <div>
+                    <h5 class="mb-1">
+                      <i class="bi bi-journal-text me-2"></i>
+                      Pinned Vocabulary: {{ pinnedVocabulary.name }}
+                    </h5>
+
+                    <small class="text-muted">
+                      Database row referenced by
+                      {{ activeVocabulary?.modelName ?? "the active model" }}.
+                    </small>
+                  </div>
+
+                  <BBadge
+                    :variant="activeVocabulary?.vocabularyFileExists ? 'success' : 'danger'"
+                  >
+                    {{ activeVocabulary?.vocabularyFileExists ? "Artifact readable" : "Artifact missing" }}
+                  </BBadge>
+                </div>
+              </BCardHeader>
+
+              <BCardBody>
+                <BRow class="g-3">
+                  <BCol
+                    v-for="row in pinnedVocabularyRows"
+                    :key="row.property"
+                    md="6"
+                  >
+                    <div class="d-flex justify-content-between border-bottom pb-2">
+                      <span class="text-muted">{{ row.property }}</span>
+
+                      <strong class="text-end ms-3">
+                        {{ row.value }}
+                      </strong>
+                    </div>
+                  </BCol>
+                </BRow>
               </BCardBody>
             </BCard>
           </BCol>

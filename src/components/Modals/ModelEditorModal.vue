@@ -16,6 +16,7 @@ import type { TransformerModelEntry } from "../../services/TransformerModelEntry
 import type { TransformerConfigEntry } from "../../services/TransformerConfigEntry";
 import type { TrainingConfigEntry } from "../../services/TrainingConfigEntry";
 import type { AccelerationBackendInfo } from "../../services/AccelerationBackendInfo";
+import type { VocabularyEntry } from "../../services/VocabularyEntry";
 
 const visible = defineModel<boolean>({
   required: true,
@@ -30,6 +31,9 @@ const props = defineProps<{
   transformerConfigs: TransformerConfigEntry[];
   trainingConfigs: TrainingConfigEntry[];
   backends?: AccelerationBackendInfo[];
+  // Compiled vocabularies offered when creating a model; the choice is stored
+  // on the model and pinned by its first training run.
+  vocabularies?: VocabularyEntry[];
   // True while the submit request is in flight; disables the save button
   // and shows a spinner so the modal feels responsive and can't double-submit.
   busy?: boolean;
@@ -70,6 +74,37 @@ const backendOptions = computed(() => {
   const currentBackend = model.value.accelerationBackend ?? "Auto";
   if (!options.some((option) => option.value === currentBackend)) {
     options.push({ value: currentBackend, text: currentBackend });
+  }
+
+  return options;
+});
+
+// The vocabulary fixes the token id space, so it is chosen at creation and
+// pinned by the first training run; the select is read-only when editing.
+const vocabularyId = computed({
+  get: () => model.value.vocabularyId ?? "",
+  set: (value: string) => {
+    model.value.vocabularyId = value || null;
+  },
+});
+
+const vocabularyOptions = computed(() => {
+  const options: { value: string; text: string }[] = [
+    { value: "", text: "Not set (decided at first training)" },
+  ];
+
+  for (const vocabulary of props.vocabularies ?? []) {
+    options.push({
+      value: vocabulary.entryId,
+      text: `${vocabulary.name} - ${vocabulary.numTokens} tokens (${vocabulary.tokenizerType})`,
+    });
+  }
+
+  // Keep a pinned vocabulary selectable even when it is not in the list
+  // (e.g. it was deleted from the picker source after being referenced).
+  const current = model.value.vocabularyId;
+  if (current && !options.some((option) => option.value === current)) {
+    options.push({ value: current, text: current });
   }
 
   return options;
@@ -151,6 +186,32 @@ const useQLora = computed({
           :options="props.trainingConfigs.map((config) => ({ value: config.entryId, text: config.name }))"
           required
         />
+      </BFormGroup>
+
+      <BFormGroup
+        label="Vocabulary"
+        label-for="model-vocabulary"
+        class="mb-3"
+      >
+        <BFormSelect
+          id="model-vocabulary"
+          v-model="vocabularyId"
+          :options="vocabularyOptions"
+          :disabled="props.operation === 'edit'"
+        />
+
+        <div class="form-text">
+          The vocabulary fixes the token id space. It is checked against the
+          model's vocabulary size when the model is created, trained and loaded.
+        </div>
+
+        <div
+          v-if="props.operation === 'edit'"
+          class="form-text text-warning"
+        >
+          The vocabulary is fixed once set; create a new model to train against
+          a different vocabulary.
+        </div>
       </BFormGroup>
 
       <BFormGroup

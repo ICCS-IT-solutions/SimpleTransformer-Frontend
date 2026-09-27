@@ -23,6 +23,21 @@ const getCurrentVocabSize = async (): Promise<ApiResponse<VocabularyPropertiesRe
     return response.data;
 }
 
+/**
+ * Vocabulary details for the currently loaded model: live vocabulary, the pinned
+ * database row, and every mismatch found between config, artifact and live map.
+ */
+const getActiveVocabulary = async (): Promise<ApiResponse<VocabularyPropertiesResponse>> => {
+    const response = await axiosClient.get('/vocabulary/active');
+    return response.data;
+}
+
+/** The same details for a specific model (used by the details view). */
+const getModelVocabulary = async (modelId: string): Promise<ApiResponse<VocabularyPropertiesResponse>> => {
+    const response = await axiosClient.get(`/vocabulary/properties/${modelId}`);
+    return response.data;
+}
+
 const uploadFiles = async (
     req: VocabularyUploadRequest
 ): Promise<ApiResponse<VocabularyLoaderResponse>> => {
@@ -50,6 +65,6 @@ const getAvailableVocabularies = async (): Promise<ApiResponse<AvailableVocabula
     return response.data;
 }
 
-export default { loadFile, compileFiles, getCurrentVocabSize, uploadFiles, getVocabSources, getAvailableVocabularies };
+export default { loadFile, compileFiles, getCurrentVocabSize, getActiveVocabulary, getModelVocabulary, uploadFiles, getVocabSources, getAvailableVocabularies };
 
 

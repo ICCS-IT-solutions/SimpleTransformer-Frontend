@@ -14,6 +14,7 @@ import {
 import { computed, onMounted, ref } from "vue";
 import transformerModelStore from "../stores/transformerModelStore";
 import configStore from "../stores/configStore";
+import vocabStore from "../stores/vocabStore";
 import type { TransformerModelEntry } from "../services/TransformerModelEntry";
 import type { CreateTransformerModelRequest } from "../services/CreateTransformerModelRequest";
 import type { AccelerationBackendInfo } from "../services/AccelerationBackendInfo";
@@ -22,6 +23,22 @@ import { useDateFormat } from "@vueuse/core";
 
 const store = transformerModelStore();
 const configs = configStore();
+const vocabularies = vocabStore();
+
+// Compiled vocabularies offered by the model picker (loaded with the rest of
+// the view so create/edit never shows a stale list).
+const availableVocabularies = computed(
+  () => vocabularies.availableVocabulariesResponse?.data?.vocabularies ?? []
+);
+
+const vocabularyNameById = computed(() =>
+  Object.fromEntries(
+    availableVocabularies.value.map((vocabulary) => [
+      vocabulary.entryId,
+      `${vocabulary.name} (${vocabulary.numTokens})`,
+    ])
+  )
+);
 
 const availableTransformerConfigs = computed(
   () => configs.transformerConfigResponse?.transformerConfigs ?? []
@@ -78,6 +95,8 @@ const defaultTransformerModelEntry = (): TransformerModelEntry => ({
     isLoaded: false,
     transformerConfigId: "",
     trainingConfigId: "",
+    //Null until a vocabulary is chosen (or the first training run pins one).
+    vocabularyId: null,
     accelerationBackend: "Auto",
     useQLora: true,
     dateCreated: new Date(),
@@ -100,7 +119,9 @@ const submitModel = async () => {
                 transformerConfig: availableTransformerConfigs.value.find((c) => c.entryId === formModel.value.transformerConfigId)!,
                 trainingConfig: availableTrainingConfigs.value.find((c) => c.entryId === formModel.value.trainingConfigId)!,
                 accelerationBackend: formModel.value.accelerationBackend ?? "Auto",
-                useQLora: formModel.value.useQLora !== false
+                useQLora: formModel.value.useQLora !== false,
+                //Null = leave it to the first training run to pin.
+                vocabularyId: formModel.value.vocabularyId ?? null
             };
             const response = await store.createTransformerModel(request);
 
@@ -122,7 +143,10 @@ const submitModel = async () => {
                 accelerationBackend: formModel.value.accelerationBackend ?? "Auto",
                 //Sent for shape consistency only: the backend deliberately keeps
                 //the stored value, so an existing model can never be flipped.
-                useQLora: formModel.value.useQLora !== false
+                useQLora: formModel.value.useQLora !== false,
+                //Same story as useQLora: the vocabulary is fixed at creation (and
+                //re-validated on train/load), so updates cannot retarget it.
+                vocabularyId: formModel.value.vocabularyId ?? null
             };
             const response = await store.updateTransformerModel(formModel.value.entryId, request);
 
@@ -161,6 +185,7 @@ onMounted(async () => {
   await configStore().getTrainingConfigs();
   await configStore().getTransformerConfigs();
   await getBackends();
+  await vocabularies.GetVocabularies();
 });
 
 const viewModel = async (_modelId: string) => {
@@ -210,6 +235,7 @@ const refresh = async () => {
     await configStore().getTrainingConfigs();
     await configStore().getTransformerConfigs();
     await getBackends();
+    await vocabularies.GetVocabularies();
   } finally {
     refreshing.value = false;
   }
@@ -239,6 +265,23 @@ const modelFields: TableField[] = [
     label: "Training Config",
     formatter: ({ value }) =>
       trainingConfigNameById.value[value as string] ?? (value as string),
+  },
+  //The vocabulary the model is pinned to; "Not pinned" until a training run
+  //records the vocabulary that matched.
+  {
+    key: "vocabularyId",
+    label: "Vocabulary",
+    formatter: ({ value, item }) => {
+      if (item.vocabulary) {
+        return `${item.vocabulary.name} (${item.vocabulary.numTokens})`;
+      }
+
+      if (value) {
+        return vocabularyNameById.value[value as string] ?? (value as string);
+      }
+
+      return "Not pinned";
+    },
   },
   {
     key: "useQLora",
@@ -416,6 +459,7 @@ const modelFields: TableField[] = [
     :transformer-configs="availableTransformerConfigs"
     :training-configs="availableTrainingConfigs"
     :backends="accelerationBackends"
+    :vocabularies="availableVocabularies"
     :busy="submitting"
     @submit="submitModel"
     />

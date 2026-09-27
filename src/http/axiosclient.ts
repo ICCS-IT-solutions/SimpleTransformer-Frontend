@@ -12,7 +12,9 @@ declare module "axios" {
 }
 
 const axiosClient = axios.create({
-    baseURL: "http://localhost:5000/api/v1",
+    //Relative URL: the Vite dev/preview server proxies /api to the backend on
+    //localhost:5000, so LAN clients hit this machine instead of their own.
+    baseURL: "/api/v1",
 });
 
 type ApiEnvelope = {
