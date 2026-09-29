@@ -78,53 +78,33 @@ const qloraIsLarger = computed(() => savings.value < 0);
       Estimated Size
     </h5>
 
-    <BAlert
-      v-if="!estimate.isValid"
-      variant="info"
-      class="mb-0"
-    >
-      Enter an architecture above to see how many parameters the model will
-      train, and how much smaller it is when created in QLoRA mode.
+    <BAlert v-if="!estimate.isValid" variant="info" class="mb-0">
+      Enter an architecture above to see how many parameters the model will train, and how
+      much smaller it is when created in QLoRA mode.
     </BAlert>
 
     <template v-else>
-      <BAlert
-        v-if="!estimate.isDivisible"
-        variant="warning"
-      >
+      <BAlert v-if="!estimate.isDivisible" variant="warning">
         <i class="bi bi-exclamation-triangle me-1"></i>
-        Embedding size must be divisible by the number of attention heads.
-        The backend rejects this configuration.
+        Embedding size must be divisible by the number of attention heads. The backend
+        rejects this configuration.
       </BAlert>
 
       <p class="text-muted small">
-        Trainable parameter counts for this architecture, assuming the AdamW
-        optimizer (weights + gradients + 2 moments = 16 bytes per parameter).
+        Trainable parameter counts for this architecture, assuming the AdamW optimizer
+        (weights + gradients + 2 moments = 16 bytes per parameter).
       </p>
 
-      <BTable
-        :items="rows"
-        :fields="sizeFields"
-        small
-        bordered
-        class="align-middle"
-      >
+      <BTable :items="rows" :fields="sizeFields" small bordered class="align-middle">
         <template #cell(label)="{ item }">
           <div class="d-flex align-items-center gap-2">
-            <BBadge
-              :variant="item.mode === 'qlora' ? 'success' : 'secondary'"
-            >
+            <BBadge :variant="item.mode === 'qlora' ? 'success' : 'secondary'">
               {{ item.mode === "qlora" ? "QLoRA" : "Raw" }}
             </BBadge>
 
             <span>{{ item.label }}</span>
 
-            <BBadge
-              v-if="highlight === item.mode"
-              variant="info"
-            >
-              In use
-            </BBadge>
+            <BBadge v-if="highlight === item.mode" variant="info"> In use </BBadge>
           </div>
         </template>
 
@@ -145,30 +125,24 @@ const qloraIsLarger = computed(() => savings.value < 0);
 
       <!-- QLoRA is not automatically cheaper: on small architectures the
            adapters outweigh the dense layers they stand in for. -->
-      <BAlert
-        v-if="qloraIsLarger"
-        variant="warning"
-        class="mb-3"
-      >
+      <BAlert v-if="qloraIsLarger" variant="warning" class="mb-3">
         <i class="bi bi-exclamation-triangle me-1"></i>
         At this size the LoRA adapters are
-        {{ Math.abs(Math.round(savings * 100)) }}% <em>larger</em> than the
-        weights they replace, so QLoRA trains more parameters than raw
-        ({{ formatBytes(estimate.qlora.trainingStateBytes) }} instead of
-        {{ formatBytes(estimate.raw.trainingStateBytes) }}). QLoRA only pays off
-        once the embedding and feed-forward matrices are large; use a raw model
-        at this scale.
+        {{ Math.abs(Math.round(savings * 100)) }}% <em>larger</em> than the weights they
+        replace, so QLoRA trains more parameters than raw ({{
+          formatBytes(estimate.qlora.trainingStateBytes)
+        }}
+        instead of {{ formatBytes(estimate.raw.trainingStateBytes) }}). QLoRA only pays
+        off once the embedding and feed-forward matrices are large; use a raw model at
+        this scale.
       </BAlert>
 
-      <BAlert
-        v-else
-        variant="success"
-        class="mb-3"
-      >
+      <BAlert v-else variant="success" class="mb-3">
         <i class="bi bi-lightning-charge me-1"></i>
-        QLoRA trains {{ Math.round(savings * 100) }}% fewer parameters
-        ({{ formatBytes(estimate.qlora.trainingStateBytes) }} of training state
-        instead of {{ formatBytes(estimate.raw.trainingStateBytes) }}).
+        QLoRA trains {{ Math.round(savings * 100) }}% fewer parameters ({{
+          formatBytes(estimate.qlora.trainingStateBytes)
+        }}
+        of training state instead of {{ formatBytes(estimate.raw.trainingStateBytes) }}).
         <template v-if="highlight === undefined">
           The training mode is chosen when a model is created, not here.
         </template>
@@ -176,18 +150,19 @@ const qloraIsLarger = computed(() => savings.value < 0);
 
       <template v-if="!compact">
         <div class="small text-muted">
-          Under QLoRA the dense base weights are frozen in 4-bit
-          ({{ formatBytes(estimate.qloraBaseWeightBytes) }} held in memory but
-          never updated), while the token embedding table stays dense and
-          trainable. It accounts for
-          {{ Math.round(embeddingShare * 100) }}% of the QLoRA trainable
-          parameters, so the saving narrows as the vocabulary grows.
+          Under QLoRA the dense base weights are frozen in 4-bit ({{
+            formatBytes(estimate.qloraBaseWeightBytes)
+          }}
+          held in memory but never updated), while the token embedding table stays dense
+          and trainable. It accounts for {{ Math.round(embeddingShare * 100) }}% of the
+          QLoRA trainable parameters, so the saving narrows as the vocabulary grows.
         </div>
 
         <div class="small text-muted mt-1">
-          The sinusoidal position buffer
-          ({{ formatBytes(estimate.positionalBufferBytes) }}) is a fixed lookup
-          table, not a trainable parameter, and is excluded from both figures.
+          The sinusoidal position buffer ({{
+            formatBytes(estimate.positionalBufferBytes)
+          }}) is a fixed lookup table, not a trainable parameter, and is excluded from
+          both figures.
         </div>
       </template>
     </template>

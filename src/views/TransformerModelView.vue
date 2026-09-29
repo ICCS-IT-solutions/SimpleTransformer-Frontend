@@ -120,7 +120,8 @@ const submitModel = async () => {
                 transformerConfig: availableTransformerConfigs.value.find((c) => c.entryId === formModel.value.transformerConfigId)!,
                 trainingConfig: availableTrainingConfigs.value.find((c) => c.entryId === formModel.value.trainingConfigId)!,
                 accelerationBackend: formModel.value.accelerationBackend ?? "Auto",
-                useQLora: formModel.value.useQLora !== false,
+                //Default false if not set.
+                useQLora: formModel.value.useQLora ?? false,
                 //Null = leave it to the first training run to pin.
                 vocabularyId: formModel.value.vocabularyId ?? null
             };
