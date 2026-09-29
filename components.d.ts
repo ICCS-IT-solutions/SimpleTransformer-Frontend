@@ -13,7 +13,9 @@ declare module 'vue' {
   export interface GlobalComponents {
     ConfigEditorModal: typeof import('./src/components/Modals/ConfigEditorModal.vue')['default']
     HelloWorld: typeof import('./src/components/HelloWorld.vue')['default']
+    ModelDetailsModal: typeof import('./src/components/Modals/ModelDetailsModal.vue')['default']
     ModelEditorModal: typeof import('./src/components/Modals/ModelEditorModal.vue')['default']
+    ModelSizeSummary: typeof import('./src/components/ModelSizeSummary.vue')['default']
     Navbar: typeof import('./src/components/Navbar.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']

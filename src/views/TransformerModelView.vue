@@ -15,6 +15,7 @@ import { computed, onMounted, ref } from "vue";
 import transformerModelStore from "../stores/transformerModelStore";
 import configStore from "../stores/configStore";
 import vocabStore from "../stores/vocabStore";
+import ModelDetailsModal from "../components/Modals/ModelDetailsModal.vue";
 import type { TransformerModelEntry } from "../services/TransformerModelEntry";
 import type { CreateTransformerModelRequest } from "../services/CreateTransformerModelRequest";
 import type { AccelerationBackendInfo } from "../services/AccelerationBackendInfo";
@@ -188,8 +189,37 @@ onMounted(async () => {
   await vocabularies.GetVocabularies();
 });
 
-const viewModel = async (_modelId: string) => {
-    
+// Property page state. Held locally rather than in the store: getModel assigns
+// store.model, which is the shared active-model slot used by the Home and
+// Inference badges, so browsing a model must not overwrite it.
+const showModelDetails = ref(false);
+const selectedModel = ref<TransformerModelEntry | null>(null);
+
+const viewModel = async (modelId: string) => {
+    // The list endpoint already returns the full entry, so the modal opens
+    // instantly; the single-model call only refreshes it.
+    selectedModel.value = availableModels.value.find((m) => m.entryId === modelId) ?? null;
+    showModelDetails.value = true;
+
+    try {
+        const response = await transformerModelService.getModel(modelId);
+
+        if (response?.statusCode === 200 && response.data?.model) {
+            selectedModel.value = response.data.model;
+        } else {
+            notify(response?.message || "Failed to load model details.", "danger");
+        }
+    } catch {
+        notify("No response received from the backend.", "danger");
+    }
+}
+
+// Jumps from the read-only property page into the existing editor.
+const editModelFromDetails = (entry: TransformerModelEntry) => {
+    formModel.value = { ...entry };
+    modelOperation.value = "edit";
+    showModelDetails.value = false;
+    openModelEditor();
 }
 
 const loadModel = async (modelId: string) => {
@@ -451,6 +481,15 @@ const modelFields: TableField[] = [
       </BCardBody>
     </BCard>
   </BContainer>
+
+  <ModelDetailsModal
+    v-model="showModelDetails"
+    v-model:model="selectedModel"
+    :transformer-configs="availableTransformerConfigs"
+    :training-configs="availableTrainingConfigs"
+    :backends="accelerationBackends"
+    @edit="editModelFromDetails"
+    />
 
   <ModelEditorModal
     v-model="showModelEditor"

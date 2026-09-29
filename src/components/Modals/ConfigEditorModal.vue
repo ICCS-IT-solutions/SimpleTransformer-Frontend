@@ -10,6 +10,7 @@ import {
 
 import TrainingConfigForm from "../Forms/TrainingConfigForm.vue";
 import TransformerConfigForm from "../Forms/TransformerConfigForm.vue";
+import ModelSizeSummary from "../ModelSizeSummary.vue";
 
 import type { TrainingConfig } from "../../services/TrainingConfig";
 import type { TransformerConfig } from "../../services/TransformerConfig";
@@ -121,6 +122,12 @@ const modalTitle = () => {
       <TransformerConfigForm
         v-if="configType === 'transformer'"
         v-model="transformerConfig"
+      />
+
+      <!-- Live raw vs QLoRA trainable-size comparison for this architecture. -->
+      <ModelSizeSummary
+        v-if="configType === 'transformer'"
+        :config="transformerConfig"
       />
 
     </BForm>
