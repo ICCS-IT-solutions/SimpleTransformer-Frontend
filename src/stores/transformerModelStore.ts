@@ -92,6 +92,13 @@ const transformerModelStore = defineStore('transformerModelStore', {
                 this.loading_activeModel = false;
             }
             return response;
+        },
+        async deleteTransformerModel (modelId: string): Promise<ApiResponse<TransformerModelResponse>> {
+            const response = await transformerModelService.deleteModel(modelId);
+            if (response?.statusCode === 200) {
+                await this.getModels();
+            }
+            return response;
         }
     }
 })

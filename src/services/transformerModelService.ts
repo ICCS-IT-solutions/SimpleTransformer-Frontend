@@ -43,6 +43,10 @@ const getActiveModel = async (): Promise<ApiResponse<TransformerModelResponse>> 
     var response = await axiosClient.get('/models/active');
     return response.data;
 }
+const deleteModel = async (modelId: string): Promise<ApiResponse<TransformerModelResponse>> => {
+    var response = await axiosClient.post(`/models/${modelId}/delete`);
+    return response.data;
+}
 
-export default { getModel, createModel, getModels, updateModel, loadModel, unloadModel, getActiveModel, getBackends };
+export default { getModel, createModel, getModels, updateModel, loadModel, unloadModel, getActiveModel, getBackends, deleteModel };
 

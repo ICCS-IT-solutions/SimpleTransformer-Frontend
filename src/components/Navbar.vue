@@ -7,6 +7,7 @@ import {
   BNavItem,
   BCollapse,
 } from "bootstrap-vue-next";
+import MemoryStatusControl from "./MemoryStatusControl.vue";
 </script>
 
 <template>
@@ -68,6 +69,9 @@ import {
       </BNavbarNav>
 
       <BNavbarNav class="ms-auto">
+
+        <!-- Global host-memory status + manual valve reset (see MemoryStatusControl). -->
+        <MemoryStatusControl />
 
         <BNavItem>
           <span class="text-success">

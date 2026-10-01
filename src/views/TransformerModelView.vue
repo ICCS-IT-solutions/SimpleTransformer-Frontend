@@ -167,6 +167,23 @@ const submitModel = async () => {
     }
 }
 
+const deleteTransformerModel = async (modelId: string) => {
+    loadingModelId.value = modelId;
+    try {
+        const response = await store.deleteTransformerModel(modelId);
+
+        if (!response) {
+            notify("No response received from the backend.", "danger");
+        } else if (response.statusCode !== 200) {
+            notify(response.message || "Failed to delete model.", "danger");
+        } else {
+            notify(response.message || "Model deleted successfully.", "success");
+        }
+    } finally {
+        loadingModelId.value = null;
+    }
+}
+
 const availableModels = computed(
   () => store.models ?? []
 );
@@ -469,6 +486,16 @@ const modelFields: TableField[] = [
                   class="bi bi-box-arrow-in-right me-1"
                 ></i>
                 {{ loadingModelId === item.entryId ? "Loading..." : "Load" }}
+            </BButton>
+            <!--Delete model-->
+            <BButton 
+                variant="outline-danger"
+                size="sm"
+                :disabled="loadingModelId !== null"
+                @click="deleteTransformerModel(item.entryId)"
+                >
+                <i class="bi bi-trash me-1"></i>
+                Delete
             </BButton>
           </div>
         </template>

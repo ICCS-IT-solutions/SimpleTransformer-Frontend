@@ -34,6 +34,7 @@ import trainingStore, {
   defaultAdamWTrainingConfig,
   defaultSgdTrainingConfig,
 } from "../stores/trainingStore";
+import memoryStore from "../stores/memoryStore";
 
 import { computed, ref, onMounted, onUnmounted, watch } from "vue";
 
@@ -45,6 +46,7 @@ import type { TrainingProgressResponse } from "../services/TrainingProgressRespo
 import type { TrainingCheckpointEntry } from "../services/TrainingCheckpointEntry";
 
 const store = trainingStore();
+const memory = memoryStore();
 
 const liveInput = ref("");
 const trainingFileInput = ref<File | readonly File[] | null>(null);
@@ -253,6 +255,24 @@ const additionalTrainingConfigPresets = computed<TrainingConfigPreset[]>(() => {
 });
 
 const currentJobs = computed(() => store.currentJobs?.data ?? []);
+
+//The backend reports OOM failures with this phrase in the job message (see
+//TrainingJobExtensions), and it is the one failure the memory valve reset
+//exists to recover from - so surface a reset action right where the user
+//will press Start/Resume to retry.
+const oomFailedJob = computed(
+  () =>
+    currentJobs.value.find(
+      (job) =>
+        job.status === TrainingJobStatus.Failed &&
+        (job.message ?? "").toLowerCase().includes("out of host memory")
+    ) ?? null
+);
+
+const resetMemoryForRetry = async () => {
+  //The failed job is not running, so the full pass (trim + compact) is safe.
+  await memory.resetMemory(true);
+};
 
 const selectedPreset = computed(() =>
   trainingConfigOptions.value.find(
@@ -1093,6 +1113,40 @@ const reset = () => {
             id="training-jobs"
             title="Training Jobs"
           >
+            <!--OOM recovery: the valve may still be latched from the excursion
+                that killed the job, so offer the reset before the retry. -->
+            <BAlert
+              v-if="oomFailedJob"
+              variant="warning"
+              class="mb-3"
+            >
+              <div class="d-flex justify-content-between align-items-center gap-3">
+                <div>
+                  <i class="bi bi-memory me-2"></i>
+                  <strong>Out of host memory.</strong>
+                  <span class="ms-1">{{ oomFailedJob.message }}</span>
+                </div>
+
+                <BButton
+                  variant="warning"
+                  size="sm"
+                  :disabled="memory.resetting"
+                  @click="resetMemoryForRetry"
+                >
+                  <BSpinner
+                    v-if="memory.resetting"
+                    small
+                    class="me-1"
+                  />
+                  <i
+                    v-else
+                    class="bi bi-arrow-counterclockwise me-1"
+                  ></i>
+                  Reset memory valve
+                </BButton>
+              </div>
+            </BAlert>
+
             <BCard>
               <BCardHeader>
                 <div class="d-flex justify-content-between align-items-center">
