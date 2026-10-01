@@ -166,6 +166,18 @@ const submitModel = async () => {
         submitting.value = false;
     }
 }
+//Reuse the same model editor modal for both create and edit, so the form is pre-filled with the existing model's data when editing.
+const editModel = (modelId: string) => {
+    const model = availableModels.value.find((m) => m.entryId === modelId);
+    if (!model) {
+        notify("Model not found.", "danger");
+        return;
+    }
+
+    formModel.value = { ...model };
+    modelOperation.value = "edit";
+    showModelEditor.value = true;
+}
 
 const deleteTransformerModel = async (modelId: string) => {
     loadingModelId.value = modelId;
@@ -449,6 +461,16 @@ const modelFields: TableField[] = [
                 <i class="bi bi-eye me-1"></i>
                 View
             </BButton>
+
+            <!--Edit-->
+            <BButton 
+              variant = "outline-warning"
+              size="sm"
+              @click=editModel(item.entryId)
+              >
+                <i class="bi bi-pencil me-1"></i>
+                Edit
+              </BButton>
 
             <BButton
                 v-if="item.isLoaded"
