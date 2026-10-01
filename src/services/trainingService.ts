@@ -30,6 +30,7 @@ const createJobFromFile = async (req: TrainingFileRequest): Promise<ApiResponse<
         formData.append("trainingCorpusId", req.trainingCorpusId);
     }
     formData.append("transformerModelId", req.transformerModelId);
+    formData.append("trainingConfigId", req.trainingConfigId);
     formData.append("vocabularyId", req.vocabularyId);
     appendPreprocessOptions(formData, req);
 

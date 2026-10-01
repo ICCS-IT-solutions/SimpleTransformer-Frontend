@@ -16,7 +16,6 @@ import {
   BFormTextarea,
   BFormSelect,
   BFormFile,
-  BFormRadioGroup,
   BTable,
   BTabs,
   BTab,
@@ -24,8 +23,6 @@ import {
   BProgress,
   BProgressBar,
   BAlert,
-  BListGroup,
-  BListGroupItem,
   BSpinner,
   type TableField,
 } from "bootstrap-vue-next";
@@ -34,18 +31,21 @@ import trainingStore, {
   defaultAdamWTrainingConfig,
   defaultSgdTrainingConfig,
 } from "../stores/trainingStore";
+import authStore from "../stores/authStore";
+import TrainingConfigSelector, {
+  type TrainingConfigPreset,
+} from "../components/Training/TrainingConfigSelector.vue";
 import memoryStore from "../stores/memoryStore";
 
 import { computed, ref, onMounted, onUnmounted, watch } from "vue";
 
-import type { TrainingConfig } from "../services/TrainingConfig";
 import type { CorpusSourceFormat } from "../services/TrainingFileRequest";
-import { OptimizerType } from "../services/OptimizerType";
 import { TrainingJobStatus } from "../services/TrainingJobStatus";
 import type { TrainingProgressResponse } from "../services/TrainingProgressResponse";
 import type { TrainingCheckpointEntry } from "../services/TrainingCheckpointEntry";
 
 const store = trainingStore();
+const auth = authStore();
 const memory = memoryStore();
 
 const liveInput = ref("");
@@ -58,30 +58,11 @@ const selectedTrainingFiles = computed<File[]>(() => {
   return Array.isArray(value) ? value : [value];
 });
 const previousCheckpointId = ref("");
-const selectedConfig = ref("adamw");
+//Pre-filled from the model's pinned training config (see the watch below).
+//The backend only accepts the config the model is pinned to, so the selector
+//is effectively a confirmation of that pointer.
+const selectedConfig = ref("");
 const isSubmitting = ref(false);
-
-const customConfig = ref<TrainingConfig>({
-  ...defaultAdamWTrainingConfig,
-});
-
-const optimizerOptions = [
-  {
-    text: "AdamW",
-    value: OptimizerType.AdamW,
-  },
-  {
-    text: "SGD",
-    value: OptimizerType.Sgd,
-  },
-];
-
-type TrainingConfigPreset = {
-  label: string;
-  value: string;
-  description: string;
-  config: TrainingConfig;
-};
 
 var refreshTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -211,6 +192,25 @@ watch(
   }
 );
 
+//The training config a job may use is the one the model is pinned to (the
+//backend rejects any other at creation), so mirror the model's pointer into
+//the selector. Watching the model list too keeps the pre-fill correct when
+//the entries arrive after the model id is already set.
+const pinnedTrainingConfigId = computed(() => {
+  const model = (store.availableModels ?? []).find(
+    model => model.entryId === store.transformerModelId
+  );
+  return model?.trainingConfigId ?? "";
+});
+
+watch(
+  [() => store.transformerModelId, () => store.availableModels],
+  () => {
+    selectedConfig.value = pinnedTrainingConfigId.value;
+  },
+  { immediate: true }
+);
+
 const trainingConfigOptions = computed<TrainingConfigPreset[]>(() => {
   const staticDefaults: TrainingConfigPreset[] = [
     {
@@ -227,17 +227,9 @@ const trainingConfigOptions = computed<TrainingConfigPreset[]>(() => {
     },
   ];
 
-  const customOption: TrainingConfigPreset = {
-    label: "Custom",
-    value: "custom",
-    description: "Configure the optimizer and training parameters manually.",
-    config: customConfig.value,
-  };
-
   return [
     ...staticDefaults,
     ...additionalTrainingConfigPresets.value,
-    customOption,
   ];
 });
 
@@ -273,20 +265,6 @@ const resetMemoryForRetry = async () => {
   //The failed job is not running, so the full pass (trim + compact) is safe.
   await memory.resetMemory(true);
 };
-
-const selectedPreset = computed(() =>
-  trainingConfigOptions.value.find(
-    (option: { value: string }) => option.value === selectedConfig.value
-  )
-);
-
-const selectedTrainingConfig = computed<TrainingConfig>(() => {
-  if (selectedConfig.value === "custom") {
-    return customConfig.value;
-  }
-
-  return selectedPreset.value?.config ?? defaultAdamWTrainingConfig;
-});
 
 const activeJobs = computed(() =>
   currentJobs.value.filter(job =>
@@ -442,12 +420,20 @@ const trainFromLiveInput = async () => {
     return;
   }
 
+  //No model selected yet, or the selection drifted from the model's pinned
+  //config (the inline "adamw"/"sgd" presets are display-only, not Guids).
+  //The backend would reject both, so don't send a payload it can't bind.
+  if (!selectedConfig.value || selectedConfig.value !== pinnedTrainingConfigId.value) {
+    return;
+  }
+
   isSubmitting.value = true;
 
   try {
     await store.createJob(
       liveInput.value,
       store.transformerModelId,
+      selectedConfig.value,
       store.vocabularyId,
       //Model and vocabulary ID's need to be passed here
       previousCheckpointId.value
@@ -465,12 +451,18 @@ const trainFromFile = async () => {
     return;
   }
 
+  //Same guard as the live tab: only the model's pinned config id is bindable.
+  if (!selectedConfig.value || selectedConfig.value !== pinnedTrainingConfigId.value) {
+    return;
+  }
+
   isSubmitting.value = true;
 
   try {
     await store.createJobFromFile(
       files,
       store.transformerModelId,
+      selectedConfig.value,
       store.vocabularyId,
       //Model and vocabulary ID's need to be passed here
       previousCheckpointId.value
@@ -525,11 +517,8 @@ const reset = () => {
   liveInput.value = "";
   trainingFileInput.value = null;
   previousCheckpointId.value = "";
-  selectedConfig.value = "adamw";
-
-  customConfig.value = {
-    ...defaultAdamWTrainingConfig,
-  };
+  //Back to the model's pinned config rather than a static preset.
+  selectedConfig.value = pinnedTrainingConfigId.value;
 };
 
 
@@ -588,6 +577,19 @@ const reset = () => {
         </BAlert>
 
 
+        <!-- Shared config selector: sits above the tabs so Live and File
+             training always use the same selection. Editing happens under
+             Configuration Management only (see TrainingConfigSelector).
+             Locked to the model's pinned config: the backend validates the
+             selected id against that pointer at job creation. -->
+        <TrainingConfigSelector
+          v-model="selectedConfig"
+          class="mb-4"
+          :options="trainingConfigOptions"
+          :can-edit="auth.canEditConfigs"
+          :disabled="!!pinnedTrainingConfigId"
+        />
+
         <BTabs
           content-class="mt-3"
           @activate-tab="handleTabChange"
@@ -603,7 +605,7 @@ const reset = () => {
           >
             <BRow class="g-4">
 
-              <BCol lg="8">
+              <BCol lg="12">
                 <BCard class="h-100">
                   <BCardHeader>
                     <BCardTitle class="mb-0">
@@ -681,92 +683,13 @@ const reset = () => {
                         <BButton
                           type="submit"
                           variant="primary"
-                          :disabled="!liveInput.trim() || isSubmitting"
+                          :disabled="!liveInput.trim() || !selectedConfig || selectedConfig !== pinnedTrainingConfigId || isSubmitting"
                         >
                           {{ isSubmitting ? "Enqueuing job..." : "Enqueue job" }}
                         </BButton>
                       </div>
 
                     </BForm>
-                  </BCardBody>
-                </BCard>
-              </BCol>
-
-              <!-- Configuration summary -->
-              <BCol lg="4">
-                <BCard class="h-100">
-                  <BCardHeader>
-                    <BCardTitle class="mb-0">
-                      Configuration
-                    </BCardTitle>
-                  </BCardHeader>
-
-                  <BCardBody>
-
-                    <h5>
-                      {{ selectedPreset?.label }}
-                    </h5>
-
-                    <p class="text-muted">
-                      {{ selectedPreset?.description }}
-                    </p>
-
-                    <BListGroup flush>
-                      <BListGroupItem
-                        class="d-flex justify-content-between px-0"
-                      >
-                        <span>Optimizer</span>
-                        <strong>
-                          {{ OptimizerType[selectedTrainingConfig.optimizer] }}
-                        </strong>
-                      </BListGroupItem>
-
-                      <BListGroupItem
-                        class="d-flex justify-content-between px-0"
-                      >
-                        <span>Learning rate</span>
-                        <strong>
-                          {{ selectedTrainingConfig.learningRate }}
-                        </strong>
-                      </BListGroupItem>
-
-                      <BListGroupItem
-                        class="d-flex justify-content-between px-0"
-                      >
-                        <span>Batch size</span>
-                        <strong>
-                          {{ selectedTrainingConfig.batchSize }}
-                        </strong>
-                      </BListGroupItem>
-
-                      <BListGroupItem
-                        class="d-flex justify-content-between px-0"
-                      >
-                        <span>Epochs</span>
-                        <strong>
-                          {{ selectedTrainingConfig.epochs }}
-                        </strong>
-                      </BListGroupItem>
-
-                      <BListGroupItem
-                        class="d-flex justify-content-between px-0"
-                      >
-                        <span>Dropout</span>
-                        <strong>
-                          {{ selectedTrainingConfig.dropoutRate }}
-                        </strong>
-                      </BListGroupItem>
-                    </BListGroup>
-
-                    <BButton
-                      v-if="selectedConfig === 'custom'"
-                      variant="outline-primary"
-                      class="w-100 mt-4"
-                      href="#custom-training-config"
-                    >
-                      Edit Configuration
-                    </BButton>
-
                   </BCardBody>
                 </BCard>
               </BCol>
@@ -784,7 +707,7 @@ const reset = () => {
           >
             <BRow class="g-4">
 
-              <BCol lg="8">
+              <BCol lg="12">
                 <BCard>
                   <BCardHeader>
                     <BCardTitle class="mb-0">
@@ -1046,58 +969,13 @@ const reset = () => {
                         <BButton
                           type="submit"
                           variant="primary"
-                          :disabled="selectedTrainingFiles.length === 0 || isSubmitting"
+                          :disabled="selectedTrainingFiles.length === 0 || !selectedConfig || selectedConfig !== pinnedTrainingConfigId || isSubmitting"
                         >
                           {{ isSubmitting ? "Enqueuing job..." : "Enqueue job" }}
                         </BButton>
                       </div>
 
                     </BForm>
-                  </BCardBody>
-                </BCard>
-              </BCol>
-
-              <BCol lg="4">
-                <BCard>
-                  <BCardHeader>
-                    <BCardTitle class="mb-0">
-                      Selected configuration
-                    </BCardTitle>
-                  </BCardHeader>
-
-                  <BCardBody>
-                    <h5>{{ selectedPreset?.label }}</h5>
-
-                    <p class="text-muted">
-                      {{ selectedPreset?.description }}
-                    </p>
-
-                    <small class="text-muted">
-                      Learning rate
-                    </small>
-                    <div class="mb-3">
-                      <strong>
-                        {{ selectedTrainingConfig.learningRate }}
-                      </strong>
-                    </div>
-
-                    <small class="text-muted">
-                      Batch size
-                    </small>
-                    <div class="mb-3">
-                      <strong>
-                        {{ selectedTrainingConfig.batchSize }}
-                      </strong>
-                    </div>
-
-                    <small class="text-muted">
-                      Epochs
-                    </small>
-                    <div>
-                      <strong>
-                        {{ selectedTrainingConfig.epochs }}
-                      </strong>
-                    </div>
                   </BCardBody>
                 </BCard>
               </BCol>
@@ -1326,137 +1204,6 @@ const reset = () => {
 
         </BTabs>
 
-        <!-- ====================================================== -->
-        <!-- CUSTOM CONFIGURATION                                   -->
-        <!-- ====================================================== -->
-
-        <BCard
-          v-if="selectedConfig === 'custom'"
-          id="custom-training-config"
-          class="mt-4"
-        >
-          <BCardHeader>
-            <BCardTitle class="mb-0">
-              Custom Training Configuration
-            </BCardTitle>
-          </BCardHeader>
-
-          <BCardBody>
-
-            <p class="text-muted">
-              Override the standard training parameters for this training run.
-            </p>
-
-            <BFormGroup
-              label="Optimizer"
-              class="mb-4"
-            >
-              <BFormRadioGroup
-                v-model="customConfig.optimizer"
-                :options="optimizerOptions"
-                name="optimizer"
-              />
-            </BFormGroup>
-
-            <BRow>
-
-              <BCol md="6">
-
-                <BFormGroup
-                  label="Learning Rate"
-                  class="mb-3"
-                >
-                  <BFormInput
-                    v-model.number="customConfig.learningRate"
-                    type="number"
-                    min="0"
-                    step="0.0001"
-                  />
-                </BFormGroup>
-
-                <BFormGroup
-                  label="Batch Size"
-                  class="mb-3"
-                >
-                  <BFormInput
-                    v-model.number="customConfig.batchSize"
-                    type="number"
-                    min="1"
-                  />
-                </BFormGroup>
-
-                <BFormGroup
-                  label="Drop Last Partial Batch"
-                  class="mb-3"
-                >
-                  <BFormCheckbox
-                    v-model="customConfig.dropLast"
-                  >
-                    {{ customConfig.dropLast === false ? "Disabled (keep remainder)" : "Enabled" }}
-                  </BFormCheckbox>
-                  <div class="form-text">
-                    Skips a trailing mini-batch smaller than Batch Size so every
-                    optimizer step uses a full batch.
-                  </div>
-                </BFormGroup>
-
-                <BFormGroup
-                  label="Epochs"
-                  class="mb-3"
-                >
-                  <BFormInput
-                    v-model.number="customConfig.epochs"
-                    type="number"
-                    min="1"
-                  />
-                </BFormGroup>
-
-              </BCol>
-
-              <BCol md="6">
-
-                <BFormGroup
-                  label="Dropout Rate"
-                  class="mb-3"
-                >
-                  <BFormInput
-                    v-model.number="customConfig.dropoutRate"
-                    type="number"
-                    min="0"
-                    max="0.99"
-                    step="0.1"
-                  />
-                </BFormGroup>
-
-                <BFormGroup
-                  label="Weight Decay"
-                  class="mb-3"
-                >
-                  <BFormInput
-                    v-model.number="customConfig.weightDecay"
-                    type="number"
-                    min="0"
-                    step="0.0001"
-                  />
-                </BFormGroup>
-
-                <BFormGroup
-                  label="Maximum Gradient Norm"
-                  class="mb-3"
-                >
-                  <BFormInput
-                    v-model.number="customConfig.maxGradientNorm"
-                    type="number"
-                    min="0"
-                  />
-                </BFormGroup>
-
-              </BCol>
-
-            </BRow>
-
-          </BCardBody>
-        </BCard>
       </BCardBody>
     </BCard>
 

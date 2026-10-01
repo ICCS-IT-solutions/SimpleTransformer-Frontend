@@ -18,6 +18,8 @@ export type TrainingFileRequest = {
     /** Saved corpus id to train on instead of uploading files. Mutually exclusive with textFiles. */
     trainingCorpusId?: string | null;
     transformerModelId: string;
+    /** Selected TrainingConfigEntry id; must match the model's pinned config (backend validates). */
+    trainingConfigId: string;
     vocabularyId: string;
     /** Selected TrainingCheckpointEntry id, or null to start from scratch. */
     previousCheckpointId: string | null;

@@ -22,6 +22,7 @@ declare module 'vue' {
     RouterView: typeof import('vue-router')['RouterView']
     ToastHost: typeof import('./src/components/ToastHost.vue')['default']
     TrainingConfigForm: typeof import('./src/components/Forms/TrainingConfigForm.vue')['default']
+    TrainingConfigSelector: typeof import('./src/components/Training/TrainingConfigSelector.vue')['default']
     TransformerConfigForm: typeof import('./src/components/Forms/TransformerConfigForm.vue')['default']
   }
 }

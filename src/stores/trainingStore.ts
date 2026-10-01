@@ -16,6 +16,8 @@ import type { TrainingCheckpointEntry } from '../services/TrainingCheckpointEntr
 
 type TrainingStoreState = {
     transformerModelId: string;
+    /** Selected TrainingConfigEntry id for the next job; must match the model's pinned config. */
+    trainingConfigId: string;
     vocabularyId: string;
     trainingResponse: ApiResponse<TrainingResponse> | null;
     
@@ -83,6 +85,7 @@ export const defaultSgdTrainingConfig : TrainingConfig = {
 
 const defaultState: TrainingStoreState = {
     transformerModelId: '',
+    trainingConfigId: '',
     vocabularyId: '',
     trainingResponse: null,
 
@@ -124,11 +127,12 @@ const defaultState: TrainingStoreState = {
 const trainingStore = defineStore('trainingStore', {
     state: () => defaultState,
     actions: {
-        async createJobFromFile(files: File[], transformerModelId: string, vocabularyId: string, previousCheckpointId: string = "") {
+        async createJobFromFile(files: File[], transformerModelId: string, trainingConfigId: string, vocabularyId: string, previousCheckpointId: string = "") {
             const useCorpus = this.selectedCorpusId !== '';
             if (!useCorpus && (!files || files.length === 0)) return;
 
             this.transformerModelId = transformerModelId;
+            this.trainingConfigId = trainingConfigId;
             this.vocabularyId = vocabularyId;
 
             this.trainingFiles = files;
@@ -139,6 +143,7 @@ const trainingStore = defineStore('trainingStore', {
                 trainingCorpusId: this.selectedCorpusId || null,
                 previousCheckpointId: this.previousCheckpointId || null,
                 transformerModelId: this.transformerModelId,
+                trainingConfigId: this.trainingConfigId,
                 vocabularyId: this.vocabularyId,
                 ...this.preprocessOptions,
             };
@@ -164,10 +169,11 @@ const trainingStore = defineStore('trainingStore', {
                 this.isPreviewingCorpus = false;
             }
         },
-        async createJob(input: string,  transformerModelId: string, vocabularyId: string,  previousCheckpointId: string = "") {
+        async createJob(input: string,  transformerModelId: string, trainingConfigId: string, vocabularyId: string,  previousCheckpointId: string = "") {
             if(input === '') return; //For now return on empty. Better yet would be to show a notification.
 
             this.transformerModelId = transformerModelId;
+            this.trainingConfigId = trainingConfigId;
             this.vocabularyId = vocabularyId;
 
             this.previousCheckpointId = previousCheckpointId;
@@ -177,6 +183,7 @@ const trainingStore = defineStore('trainingStore', {
                 inputText: this.trainingInput, 
                 previousCheckpointId: this.previousCheckpointId || null,
                 transformerModelId: this.transformerModelId,
+                trainingConfigId: this.trainingConfigId,
                 vocabularyId: this.vocabularyId,
             };
 

@@ -28,7 +28,8 @@ const router = createRouter({
         {
             path: '/configmanagement',
             name: 'config',
-            component: () => import('./views/ConfigManagerView.vue')
+            component: () => import('./views/ConfigManagerView.vue'),
+            meta: { requiresAdmin: true }
         },
         {
             path: '/corpora',
@@ -48,5 +49,13 @@ const router = createRouter({
         }
     ]
 });
+
+// RBAC seam: once real authentication exists, enforce admin-only routes here.
+// Kept as a skeleton for now because authStore defaults to the 'admin' role.
+// router.beforeEach((to) => {
+//     if (to.meta.requiresAdmin && !authStore().isAdmin) {
+//         return { name: 'home' };
+//     }
+// });
 
 export default router;

@@ -12,10 +12,12 @@ import {
   BTabs,
   BTab,
   BTable, 
+  BAlert,
   type TableField,
 } from "bootstrap-vue-next";
 import { computed, onMounted, ref } from "vue";
 import configStore from "../stores/configStore";
+import authStore from "../stores/authStore";
 import { OptimizerType } from "../services/OptimizerType";
 import type { TrainingConfig } from "../services/TrainingConfig";
 import type { TransformerConfig } from "../services/TransformerConfig";
@@ -26,6 +28,7 @@ import type { CreateTrainingConfigRequest } from "../services/CreateTrainingConf
 import ConfigEditorModal from "../components/Modals/ConfigEditorModal.vue";
 
 const store = configStore();
+const auth = authStore();
 
 const defaultTransformerConfig = (): TransformerConfig => ({
   vocabSize: 5000,
@@ -164,6 +167,11 @@ const editTransformerConfig = async (configId: string) => {
   showCreateConfigModal.value = true;
 };
 const submitConfig = async () => {
+  // RBAC seam: never persist when the current role may only read configs.
+  if (!auth.canEditConfigs) {
+    return;
+  }
+
   if (!formName.value.trim()) {
     return;
   }
@@ -300,6 +308,15 @@ onMounted(async () => {
 
     <BCard>
       <BCardBody>
+        <BAlert
+          v-if="!auth.canEditConfigs"
+          variant="info"
+          show
+          class="mb-3"
+        >
+          You have read-only access to configurations.
+        </BAlert>
+
         <BTabs>
           <!-- Training configurations -->
           <BTab title="Training Configs">
@@ -313,6 +330,7 @@ onMounted(async () => {
 
               <BCol cols="auto">
                 <BButton
+                  v-if="auth.canEditConfigs"
                   variant="primary"
                   @click="createTrainingConfig"
                 >
@@ -332,6 +350,7 @@ onMounted(async () => {
             >
               <template #cell(actions)="{ item }">
                 <BButton
+                  v-if="auth.canEditConfigs"
                   variant="outline-primary"
                   size="sm"
                   @click="editTrainingConfig(item.entryId)"
@@ -361,6 +380,7 @@ onMounted(async () => {
 
               <BCol cols="auto">
                 <BButton
+                  v-if="auth.canEditConfigs"
                   variant="primary"
                   @click="createTransformerConfig"
                 >
@@ -380,6 +400,7 @@ onMounted(async () => {
             >
               <template #cell(actions)="{ item }">
                 <BButton
+                  v-if="auth.canEditConfigs"
                   variant="outline-primary"
                   size="sm"
                   @click="editTransformerConfig(item.entryId)"
