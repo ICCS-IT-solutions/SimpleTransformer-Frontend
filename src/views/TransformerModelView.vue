@@ -422,7 +422,7 @@ const modelFields: TableField[] = [
         bordered
         >
         <template #cell(actions)="{ item }">
-            <div class="d-flex justify-content-end gap-2">
+          <div class="d-flex justify-content-end gap-2">
             <BButton
                 variant="outline-primary"
                 size="sm"
@@ -470,7 +470,7 @@ const modelFields: TableField[] = [
                 ></i>
                 {{ loadingModelId === item.entryId ? "Loading..." : "Load" }}
             </BButton>
-            </div>
+          </div>
         </template>
 
         <template #empty>

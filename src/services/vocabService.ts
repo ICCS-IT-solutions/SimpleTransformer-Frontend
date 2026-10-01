@@ -65,6 +65,10 @@ const getAvailableVocabularies = async (): Promise<ApiResponse<AvailableVocabula
     return response.data;
 }
 
-export default { loadFile, compileFiles, getCurrentVocabSize, getActiveVocabulary, getModelVocabulary, uploadFiles, getVocabSources, getAvailableVocabularies };
+/** Deletes a compiled vocabulary (DB row + files on disk) by name. */
+const deleteVocabulary = async (vocabularyName: string): Promise<ApiResponse<boolean>> => {
+    var response = await axiosClient.post(`/vocabulary/${vocabularyName}/delete`);
+    return response.data;
+}
 
-
+export default { loadFile, compileFiles, getCurrentVocabSize, getActiveVocabulary, getModelVocabulary, uploadFiles, getVocabSources, getAvailableVocabularies, deleteVocabulary };

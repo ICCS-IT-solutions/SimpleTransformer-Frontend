@@ -257,6 +257,37 @@ const compileResultFields = [
   },
 ];
 
+const availableVocabFields = [
+  {
+    key: "name",
+    label: "Vocabulary Name",
+  },
+  {
+    key: "tokenizerType",
+    label: "Tokenizer",
+  },
+  {
+    key: "requestedSize",
+    label: "Requested Size",
+  },
+  {
+    key: "numTokens",
+    label: "Actual Size",
+  },
+  {
+    key: "typesSeen",
+    label: "Types Seen",
+  },
+  {
+    key: "coverage",
+    label: "Coverage",
+  },
+  {
+    key: "actions",
+    label: "Actions",
+  },
+];  
+
 const compileResult = computed(
   () => store.vocabularyCompileResponse?.data ?? null
 );
@@ -400,6 +431,20 @@ const getAvailableVocabularies = async () => {
   }
 
 }
+
+/**
+ * Deletes a compiled vocabulary, then re-syncs the local copy of the list the
+ * table renders from (the store refreshes its own response on success).
+ */
+const deleteVocabulary = async (name: string) => {
+  await store.DeleteVocabulary(name);
+
+  if (store.availableVocabulariesResponse?.data) {
+    availableVocabularies.value =
+      store.availableVocabulariesResponse.data.vocabularies;
+  }
+};
+
 
 const isFileSelected = (file: VocabularySourceFile) =>
   selectedFilesToCompile.value.some(
@@ -994,6 +1039,62 @@ onMounted(async () => {
           </BCardBody>
         </BCard>
 
+      </BTab>
+
+      <!-- ========================================================= -->
+      <!-- AVAILABLE VOCABULARIES -->
+      <!-- ========================================================= -->
+      <BTab title="Available Vocabularies">
+        <BCard>
+
+          <BCardHeader>
+            <h5 class="mb-0">
+              <i class="bi bi-list me-2"></i>
+              Available Vocabularies
+            </h5>
+          </BCardHeader>
+
+          <BCardBody>
+
+            <div
+              v-if="availableVocabularies.length === 0"
+              class="text-center text-muted py-5"
+            >
+              <i class="bi bi-folder2-open fs-1 d-block mb-2"></i>
+
+              <h5>No vocabularies available</h5>
+
+              <p class="mb-0">
+                Compile a vocabulary from source files to see it listed here.
+              </p>
+            </div>
+
+            <BTable
+              v-else
+              :items="availableVocabularies"
+              :fields="availableVocabFields"
+              responsive
+              striped
+              hover
+              bordered
+            >
+              <!--Buttons for management actions can be added here-->
+              <template #cell(actions)="{ item }">
+                <div class="d-flex justify-content-end gap-2">
+                  <BButton
+                    size="sm"
+                    variant="outline-danger"
+                    title="Delete"
+                    @click="deleteVocabulary(item.name)"
+                  >
+                    <i class="bi bi-trash"></i>
+                  </BButton>
+                </div>
+              </template>
+            </BTable>
+
+          </BCardBody>
+        </BCard>
       </BTab>
 
       <!-- ========================================================= -->

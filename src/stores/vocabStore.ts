@@ -113,6 +113,21 @@ const vocabStore = defineStore('vocabStore', {
         async GetVocabularies () {
             this.availableVocabulariesResponse = await vocabService.getAvailableVocabularies();
         },
+        async DeleteVocabulary (vocabularyName: string) {
+            const response = await vocabService.deleteVocabulary(vocabularyName);
+
+            //The backend reports failures inside an HTTP 200 envelope, so the
+            //list is only refreshed when the delete actually succeeded.
+            if (
+                response.statusCode >= 400 ||
+                response.status !== ResponseStatus.Success
+            ) {
+                return response;
+            }
+
+            await this.GetVocabularies();
+            return response;
+        },
 
         reset() {
             Object.assign(this, defaultState)
