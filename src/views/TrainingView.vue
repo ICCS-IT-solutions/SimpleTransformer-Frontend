@@ -582,13 +582,6 @@ const reset = () => {
              Configuration Management only (see TrainingConfigSelector).
              Locked to the model's pinned config: the backend validates the
              selected id against that pointer at job creation. -->
-        <TrainingConfigSelector
-          v-model="selectedConfig"
-          class="mb-4"
-          :options="trainingConfigOptions"
-          :can-edit="auth.canEditConfigs"
-          :disabled="!!pinnedTrainingConfigId"
-        />
 
         <BTabs
           content-class="mt-3"
@@ -1202,7 +1195,16 @@ const reset = () => {
             </BCard>
           </BTab>
 
-        </BTabs>
+        </BTabs>          
+
+        <TrainingConfigSelector
+          v-model="selectedConfig"
+          class="mb-4"
+          :options="trainingConfigOptions"
+          :can-edit="auth.canEditConfigs"
+          :disabled="!!pinnedTrainingConfigId"
+        />
+
 
       </BCardBody>
     </BCard>
