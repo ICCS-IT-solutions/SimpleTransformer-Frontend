@@ -1194,18 +1194,20 @@ const reset = () => {
               </BCardBody>
             </BCard>
           </BTab>
-
+          
+          <!--Config selector tab-->
+          <BTab
+            id="select-config"
+            title="Configuration Selection">
+            <TrainingConfigSelector
+              v-model="selectedConfig"
+              class="mb-4"
+              :options="trainingConfigOptions"
+              :can-edit="auth.canEditConfigs"
+              :disabled="!!pinnedTrainingConfigId"
+            />           
+          </BTab>
         </BTabs>          
-
-        <TrainingConfigSelector
-          v-model="selectedConfig"
-          class="mb-4"
-          :options="trainingConfigOptions"
-          :can-edit="auth.canEditConfigs"
-          :disabled="!!pinnedTrainingConfigId"
-        />
-
-
       </BCardBody>
     </BCard>
 
