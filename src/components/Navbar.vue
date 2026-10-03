@@ -66,6 +66,12 @@ import MemoryStatusControl from "./MemoryStatusControl.vue";
           Models
         </BNavItem>
 
+        <!-- Server logs (7-day rolling) and retained fault events. -->
+        <BNavItem :to="{ name: 'diagnostics' }">
+          <i class="bi bi-journal-text me-1"></i>
+          Diagnostics
+        </BNavItem>
+
       </BNavbarNav>
 
       <BNavbarNav class="ms-auto">

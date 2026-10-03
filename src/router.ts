@@ -41,6 +41,15 @@ const router = createRouter({
             name: 'models',
             component: () => import('./views/TransformerModelView.vue')
         },
+        {
+            path: '/diagnostics',
+            name: 'diagnostics',
+            component: () => import('./views/LogsView.vue'),
+            // Logs and fault records can carry SQL parameters and training text,
+            // so this is admin-only. Cosmetic until the RBAC guard is enabled;
+            // enforcement has to happen server-side as well.
+            meta: { requiresAdmin: true }
+        },
         //Catch-all
         {
             path: '/:pathMatch(.*)*',

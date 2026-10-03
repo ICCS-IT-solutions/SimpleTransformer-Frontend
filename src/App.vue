@@ -1,4 +1,3 @@
-```vue
 <script setup lang="ts">
 import { BApp } from "bootstrap-vue-next";
 import { RouterView } from "vue-router";
@@ -50,4 +49,3 @@ body {
   width: 100%;
 }
 </style>
-```

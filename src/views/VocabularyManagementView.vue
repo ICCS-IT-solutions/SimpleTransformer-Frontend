@@ -1,4 +1,3 @@
-```vue
 <script lang="ts" setup>
 import {
   BContainer,
@@ -1362,4 +1361,3 @@ onMounted(async () => {
 
   </BContainer>
 </template>
-```

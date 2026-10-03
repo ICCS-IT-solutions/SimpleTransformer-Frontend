@@ -1,4 +1,3 @@
-```vue
 <script lang="ts" setup>
 import {
   BContainer,
@@ -1213,4 +1212,3 @@ const reset = () => {
 
   </BContainer>
 </template>
-```
