@@ -1,5 +1,7 @@
 import { defineStore } from 'pinia';
 import type { TrainingConfig } from '../services/TrainingConfig';
+import { PrecisionMode } from '../services/PrecisionMode';
+import { CheckpointPolicy } from '../services/CheckpointPolicy';
 import type { TrainingFileRequest, CorpusPreviewRequest, CorpusPreprocessOptions, CorpusPreprocessReport, TrainingCorpusEntry } from '../services/TrainingFileRequest';
 import type { TrainingRequest } from '../services/TrainingRequest';
 import trainingService from '../services/trainingService';
@@ -62,7 +64,10 @@ export const defaultAdamWTrainingConfig : TrainingConfig = {
     sgdMomentum: 0,
     useNesterov: false,
     warmupSteps: 0,
-    minLearningRate: 0
+    minLearningRate: 0,
+    gradientAccumulationSteps: 1,
+    precision: PrecisionMode.FP32,
+    checkpointPolicy: CheckpointPolicy.None
 }
 
 export const defaultSgdTrainingConfig : TrainingConfig = {
@@ -80,7 +85,10 @@ export const defaultSgdTrainingConfig : TrainingConfig = {
     sgdMomentum: 0.9,
     useNesterov: true,
     warmupSteps: 0,
-    minLearningRate: 0
+    minLearningRate: 0,
+    gradientAccumulationSteps: 1,
+    precision: PrecisionMode.FP32,
+    checkpointPolicy: CheckpointPolicy.None
 }
 
 const defaultState: TrainingStoreState = {

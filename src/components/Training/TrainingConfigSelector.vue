@@ -16,6 +16,8 @@ import {
 
 import type { TrainingConfig } from "../../services/TrainingConfig";
 import { OptimizerType } from "../../services/OptimizerType";
+import { PrecisionMode } from "../../services/PrecisionMode";
+import { CheckpointPolicy } from "../../services/CheckpointPolicy";
 
 export type TrainingConfigPreset = {
   label: string;
@@ -83,6 +85,9 @@ const detailRows = computed<DetailRow[]>(() => {
     { label: "Warmup steps", value: formatNumber(config.warmupSteps) },
     { label: "Min learning rate", value: formatNumber(config.minLearningRate) },
     { label: "Drop last partial batch", value: formatBoolean(config.dropLast) },
+    { label: "Gradient accumulation steps", value: formatNumber(config.gradientAccumulationSteps) },
+    { label: "Precision", value: PrecisionMode[config.precision ?? PrecisionMode.FP32] },
+    { label: "Checkpoint policy", value: CheckpointPolicy[config.checkpointPolicy ?? CheckpointPolicy.None] },
   ];
 
   if (isSgd.value) {

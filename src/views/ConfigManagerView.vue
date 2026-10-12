@@ -18,6 +18,8 @@ import { computed, onMounted, ref } from "vue";
 import configStore from "../stores/configStore";
 import authStore from "../stores/authStore";
 import { OptimizerType } from "../services/OptimizerType";
+import { PrecisionMode } from "../services/PrecisionMode";
+import { CheckpointPolicy } from "../services/CheckpointPolicy";
 import type { TrainingConfig } from "../services/TrainingConfig";
 import type { TransformerConfig } from "../services/TransformerConfig";
 import type { UpdateTransformerConfigRequest } from "../services/UpdateTransformerConfigRequest";
@@ -55,6 +57,9 @@ const defaultTrainingConfig = (): TrainingConfig => ({
   useNesterov: true,
   warmupSteps: 0,
   minLearningRate: 0,
+  gradientAccumulationSteps: 1,
+  precision: PrecisionMode.FP32,
+  checkpointPolicy: CheckpointPolicy.None,
 });
 
 const trainingConfigs = computed(

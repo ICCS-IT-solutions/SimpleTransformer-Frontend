@@ -1,5 +1,6 @@
 import type { OptimizerType } from "./OptimizerType";
-
+import type { PrecisionMode } from "./PrecisionMode";
+import type { CheckpointPolicy } from "./CheckpointPolicy";
 
 export type TrainingConfig = {
     optimizer: OptimizerType;
@@ -20,4 +21,10 @@ export type TrainingConfig = {
     useNesterov: boolean;
     warmupSteps: number;
     minLearningRate: number;
+    // Gradient accumulation: accumulate gradients over N steps before updating weights
+    gradientAccumulationSteps?: number;
+    // Mixed precision training: FP32, FP16, or BF16
+    precision?: PrecisionMode;
+    // Activation checkpointing policy to reduce activation memory
+    checkpointPolicy?: CheckpointPolicy;
 };
